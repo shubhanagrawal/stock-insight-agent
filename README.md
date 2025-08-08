@@ -31,7 +31,7 @@ The agent operates on a simple, 4-stage pipeline:
 
 `Scrape News -> Extract Tickers -> Analyze Sentiment -> Generate Insight`
 
-![A simple flowchart showing the 4 stages of the pipeline] `(Create a simple diagram and add it here)`
+![A simple flowchart showing the 4 stages of the pipeline] 
 
 ### **Tech Stack**
 

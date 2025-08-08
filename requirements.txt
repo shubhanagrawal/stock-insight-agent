@@ -1,1 +1,14 @@
+# Core libraries for web requests and scraping
+requests
 feedparser
+beautifulsoup4
+
+# API clients for AI models
+groq
+huggingface_hub
+
+# Web app dashboard
+streamlit
+
+# For loading environment variables (.env file)
+python-dotenv
