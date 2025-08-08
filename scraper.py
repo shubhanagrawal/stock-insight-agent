@@ -1,71 +1,44 @@
-import requests
+# SEGMENT 3: scraper.py (FIXED)
 import feedparser
-from newspaper import Article # New import!
+import requests
+from bs4 import BeautifulSoup
+import logging
 
-# The Economic Times Markets RSS feed
-NEWS_FEED_URL = "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms"
+logging.basicConfig(level=logging.INFO)
 
-# Headers to mimic a real browser
-HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Connection': 'keep-alive',
-}
+RSS_FEED_URL = "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms"
 
-def fetch_latest_article():
-    """
-    Fetches the latest article from the RSS feed and returns its
-    title, URL, and full text content.
-    """
-    print("Attempting to fetch RSS feed...")
+def get_article_content(url):
     try:
-        response = requests.get(NEWS_FEED_URL, headers=HEADERS, timeout=10)
+        response = requests.get(url, timeout=5)
         if response.status_code == 200:
-            print("RSS feed fetch successful. Parsing feed...")
-            feed = feedparser.parse(response.content)
-            
-            if feed.entries:
-                # Get the first article from the feed
-                latest_entry = feed.entries[0]
-                article_url = latest_entry.link
-                
-                print(f"Found article: {latest_entry.title}")
-                print(f"Fetching full content from: {article_url}")
-
-                # Use newspaper3k to get the full article text
-                try:
-                    article = Article(article_url)
-                    article.download()
-                    article.parse()
-                    
-                    # Return a dictionary with all the info we need
-                    return {
-                        "title": latest_entry.title,
-                        "url": article_url,
-                        "text": article.text
-                    }
-                except Exception as e:
-                    print(f"Error fetching full article content with newspaper3k: {e}")
-                    return None
-            else:
-                print("Error: No entries found in the RSS feed.")
-                return None
-        else:
-            print(f"Error: Failed to fetch RSS feed. Status code: {response.status_code}")
-            return None
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred during the network request: {e}")
+            soup = BeautifulSoup(response.text, 'html.parser')
+            article = soup.find('div', class_='Normal') or soup.find('article')
+            return article.get_text(strip=True) if article else None
+        return None
+    except Exception as e:
+        logging.warning(f"Error fetching article content from {url}: {e}")
         return None
 
-if __name__ == "__main__":
-    article_data = fetch_latest_article()
-    
-    if article_data:
-        print("\n✅ SUCCESS! Article data extracted.")
-        print("------------------------------------")
-        print(f"Title: {article_data['title']}")
-        print(f"URL: {article_data['url']}")
-        print(f"\nText: \n{article_data['text'][:500]}...") # Print first 500 chars of text
-    else:
-        print("\n❌ Failed to fetch article data.")
+def scrape_news(limit=1):
+    logging.info("Attempting to fetch RSS feed...")
+    feed = feedparser.parse(RSS_FEED_URL)
+    articles = []
+
+    if 'entries' not in feed or not feed.entries:
+        logging.warning("No articles found in RSS feed.")
+        return articles
+
+    logging.info("RSS feed fetch successful. Parsing feed...")
+    for entry in feed.entries[:limit]:
+        title = entry.title
+        link = entry.link
+        logging.info(f"Found article: {title}")
+        content = get_article_content(link)
+        if content:
+            articles.append({"title": title, "link": link, "content": content})
+            logging.info(f"Successfully scraped article: \"{title}\"")
+        else:
+            logging.warning(f"Could not scrape full content for article: \"{title}\"")
+
+    return articles

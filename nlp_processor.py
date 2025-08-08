@@ -1,61 +1,90 @@
+# nlp_processor.py
 import os
 import json
-from groq import Groq # Import the new library
+import logging
+import re
+from groq import Groq
 from dotenv import load_dotenv
+from ticker_mapping import KNOWN_COMPANIES
 
-# Load environment variables from .env file
+# --- Setup ---
 load_dotenv()
-
-# Create a Groq client, which automatically uses the key from the .env file
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-PROMPT = """
+# UPDATED: The prompt is now much stricter to prevent non-JSON output.
+PROMPT_INSTRUCTIONS = """
 You are an expert financial analyst AI for the Indian stock market. Your task is to read the following news article and identify all publicly-listed Indian companies mentioned.
 
-For each company you identify, provide its official NSE stock ticker symbol.
-
 Instructions:
-- Your response must be ONLY a single, valid JSON object, with no extra text, explanations, or markdown formatting like ```json.
-- The JSON object should have company names as keys and ticker symbols as values.
-- Ignore generic market terms like BSE, NSE, Sensex, and Nifty.
-- If you are not highly confident about a ticker for a mentioned company, omit it.
+- Your response MUST be ONLY a single, valid JSON object.
+- DO NOT add any notes, explanations, or markdown formatting.
+- The JSON object should be a dictionary where keys are the company names and values are their official NSE stock ticker symbols.
+- If you are not 100% confident about a ticker, or if a company is not listed, DO NOT include it in the JSON.
+- If no publicly-listed Indian companies are found, return an empty JSON object {}.
 
-Here is the article text:
----
-{text}
----
+News:
 """
 
-def get_tickers_from_text(text):
+def extract_tickers(text):
     """
-    Uses the Groq API with Llama 3 to extract companies and tickers from text.
+    Finds tickers using a robust "LLM-first, local validation" approach.
     """
-    if not os.getenv("GROQ_API_KEY"):
-        print("🔴 FATAL ERROR: Groq API Key not found. Please check your .env file.")
+    logging.info("🤖 Using LLM to perform primary analysis...")
+    try:
+        if not client.api_key:
+            logging.error("❌ Groq API key not found.")
+            return {}
+
+        # Construct the prompt via concatenation to be more robust
+        full_prompt = PROMPT_INSTRUCTIONS + text
+
+        # --- Step 1: Always call the LLM to get potential companies ---
+        response = client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[{"role": "user", "content": full_prompt}],
+            temperature=0.1,
+            response_format={"type": "json_object"}
+        )
+        content = response.choices[0].message.content
+        llm_results = json.loads(content)
+        
+        if not llm_results:
+            logging.warning("LLM returned no companies.")
+            return {}
+            
+        logging.info(f"LLM identified potential tickers: {llm_results}")
+
+        # --- Step 2: Validate LLM results against our known list ---
+        # UPDATED: More precise validation logic.
+        final_tickers = {}
+        validated_companies = []
+
+        # Prioritize longer, more specific matches first
+        sorted_llm_results = sorted(llm_results.items(), key=lambda item: len(item[0]), reverse=True)
+
+        for company, ticker in sorted_llm_results:
+            # Check if the company found by the LLM is in our trusted list
+            for known_company, known_ticker in KNOWN_COMPANIES.items():
+                # This ensures "Tata Motors" matches "Tata Motors", but "SBI" doesn't match "SBI Life"
+                if company.lower() == known_company.lower():
+                    logging.info(f"🎯 Validated LLM result with local map: {known_company}")
+                    validated_companies.append((known_company, known_ticker))
+        
+        # If we have validated companies, return the first one
+        if validated_companies:
+            first_match = validated_companies[0]
+            return {first_match[0]: first_match[1]}
+
+        # If no validated match, trust the first valid result from the LLM
+        logging.info("No validated companies found. Trusting the first valid LLM result.")
+        if llm_results:
+            first_company = next(iter(llm_results))
+            first_ticker = llm_results[first_company]
+            if first_ticker: # Ensure the ticker is not None
+                return {first_company: first_ticker}
+
         return {}
 
-    print("✅ Groq API Key loaded. Contacting Groq API for analysis...")
-
-    try:
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {
-                    "role": "user",
-                    "content": PROMPT.format(text=text),
-                }
-            ],
-            # We use Llama 3, which is excellent and fast
-            model="llama3-8b-8192",
-            temperature=0.0, # Low temperature for factual, deterministic output
-            response_format={"type": "json_object"}, # Force JSON output
-        )
-
-        raw_response_text = chat_completion.choices[0].message.content
-        print(f"DEBUG: Raw API Response:\n---\n{raw_response_text}\n---")
-
-        ticker_map = json.loads(raw_response_text)
-        return ticker_map
-
     except Exception as e:
-        print(f"🔴 An unexpected error occurred during the Groq API call: {e}")
+        logging.error(f"❌ Error during NLP processing: {e}")
         return {}
