@@ -164,7 +164,9 @@ def main():
         st.header("⚙️ Control Panel")
         news_sources = {
             "Economic Times - Markets": "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
-            "Livemint - Markets": "https://www.livemint.com/rss/markets",
+            "Livemint - Markets": "https://www.livemint.com/rss/markets,
+            "ET Markets - Stocks": "https://economictimes.indiatimes.com/markets/stocks/rssfeeds/2146842.cms",
+            "Moneycontrol - Top News": "https://www.moneycontrol.com/rss/MCtopnews.xml"
         }
         selected_source_name = st.selectbox("📰 News Source", list(news_sources.keys()))
         selected_source_url = news_sources[selected_source_name]
