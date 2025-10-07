@@ -1,14 +1,17 @@
-# Core libraries for web requests and scraping
-requests
+# Core app and data handling
+streamlit
+pandas
+
+# Plotting
+plotly
+
+# Web scraping and RSS feeds
 feedparser
+requests
 beautifulsoup4
 
-# API clients for AI models
-groq
-huggingface_hub
+# NLP and sentiment analysis
+textblob
 
-# Web app dashboard
-streamlit
-
-# For loading environment variables (.env file)
+# For loading environment variables (API keys)
 python-dotenv
