@@ -112,7 +112,6 @@ def display_insights(insights_container, sentiment_container, companies_containe
             sentiment_colors = {'Positive': '#28a745', 'Negative': '#dc3545', 'Neutral': '#6c757d'}
             color = sentiment_colors.get(data['sentiment'], '#6c757d')
             
-            # The unsafe_allow_html=True parameter is critical here to render HTML
             st.markdown(f"""
             <div style="border-left: 4px solid {color}; padding: 1rem; margin: 1rem 0; background: #f8f9fa; border-radius: 5px; padding-top: 10px; padding-bottom: 10px;">
                 <h4>{data['title']}</h4>
@@ -127,7 +126,7 @@ def display_insights(insights_container, sentiment_container, companies_containe
                     <p style="margin-top: 5px;">{data['content_preview']}</p>
                 </details>
             </div>
-            """, unsafe_allow_html=True) # <-- THIS IS THE CRITICAL FIX
+            """, unsafe_allow_html=True)
     
     sentiments = [item['sentiment'] for item in st.session_state.insights_history]
     if sentiments:
@@ -158,7 +157,28 @@ def main():
         
         news_sources = {
             "ET Markets - Stocks": "https://economictimes.indiatimes.com/markets/stocks/rssfeeds/2146842.cms",
+            "ET Markets - News": "https://economictimes.indiatimes.com/markets/stocks/news/rssfeeds/2146554.cms",
+            "ET Markets - Earnings": "https://economictimes.indiatimes.com/markets/stocks/earnings/rssfeeds/2146561.cms",
+            "ET Markets - IPO": "https://economictimes.indiatimes.com/markets/ipo/rssfeeds/67812142.cms",
+            "ET Markets - Economy": "https://economictimes.indiatimes.com/news/economy/rssfeeds/1373380680.cms",
             "Moneycontrol - Top News": "https://www.moneycontrol.com/rss/MCtopnews.xml",
+            "Moneycontrol - Business": "https://www.moneycontrol.com/rss/business.xml",
+            "Moneycontrol - IPO": "https://www.moneycontrol.com/rss/ipo.xml",
+            "Moneycontrol - Results": "https://www.moneycontrol.com/rss/results.xml",
+            "Moneycontrol - Marketedge": "https://www.moneycontrol.com/rss/marketedge.xml",
+            "Business Standard - Markets": "https://www.business-standard.com/rss/markets-106.rss",
+            "Business Standard - Companies": "https://www.business-standard.com/rss/companies-101.rss",
+            "Business Standard - Economy": "https://www.business-standard.com/rss/economy-policy-102.rss",
+            "Livemint - Money": "https://www.livemint.com/rss/money",
+            "Livemint - Markets": "https://www.livemint.com/rss/markets",
+            "Livemint - Companies": "https://www.livemint.com/rss/companies",
+            "The Hindu BusinessLine - Markets": "https://www.thehindubusinessline.com/markets/?service=rss",
+            "The Hindu BusinessLine - Companies": "https://www.thehindubusinessline.com/companies/?service=rss",
+            "The Hindu BusinessLine - Economy": "https://www.thehindubusinessline.com/economy/?service=rss",
+            "Financial Express - Market": "https://www.financialexpress.com/market/rss",
+            "Financial Express - Economy": "https://www.financialexpress.com/economy/rss",
+            "NDTV Profit - Latest": "https://www.ndtvprofit.com/feed",
+            "Reuters India - Business": "https://www.reuters.com/places/india/business",
         }
         selected_source_name = st.selectbox("📰 News Source", list(news_sources.keys()))
         selected_source_url = news_sources[selected_source_name]
