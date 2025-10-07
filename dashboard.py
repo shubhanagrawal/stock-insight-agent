@@ -56,7 +56,6 @@ def fetch_and_analyze_news(source_url, article_limit):
     logging.info("🚀 Starting the AI Insight Agent run...")
     with st.spinner("🔍 Analyzing latest market news..."):
         try:
-            # --- STAGE 1: SCRAPING ---
             articles = scrape_news(url=source_url, limit=article_limit)
             if not articles:
                 st.warning("Could not fetch any articles.")
@@ -65,22 +64,17 @@ def fetch_and_analyze_news(source_url, article_limit):
 
             new_insights = []
             
-            # --- Process each article found ---
             for article in articles:
                 logging.info(f"Processing article: \"{article['title']}\"")
-
-                # --- STAGE 2: NLP PROCESSING (Ticker Extraction) ---
                 tickers = extract_tickers(article['content'])
                 if not tickers:
                     logging.warning("No actionable tickers found. Moving to next article.")
                     continue
                 logging.info(f"🎯 Tickers Extracted: {tickers}")
 
-                # --- STAGE 3: INFERENCE (Sentiment Analysis) ---
                 sentiment_result = analyze_sentiment(article['content'])
                 logging.info(f"Sentiment analysis complete: {sentiment_result}")
 
-                # --- FINAL STAGE: GENERATE INSIGHT ---
                 insight = generate_insight(article['title'], tickers, sentiment_result)
                 logging.info("📊 Final Insight Generated.")
                 
@@ -89,12 +83,11 @@ def fetch_and_analyze_news(source_url, article_limit):
                     'title': article['title'],
                     'url': article['link'],
                     'tickers': tickers,
-                    'sentiment': sentiment_result['sentiment'], # Extract the sentiment string
+                    'sentiment': sentiment_result['sentiment'],
                     'insight': insight,
                     'content_preview': article['content'][:200] + "..."
                 })
 
-            # Add new insights to history and keep the list size manageable
             st.session_state.insights_history.extend(new_insights)
             st.session_state.insights_history = st.session_state.insights_history[-20:]
             
@@ -105,8 +98,6 @@ def fetch_and_analyze_news(source_url, article_limit):
             st.error(f"❌ An error occurred: {str(e)}")
             logging.error(f"An error occurred during the pipeline: {str(e)}")
 
-# In your dashboard.py file
-
 def display_insights(insights_container, sentiment_container, companies_container):
     """
     Renders the collected insights and analytics in the UI.
@@ -115,15 +106,13 @@ def display_insights(insights_container, sentiment_container, companies_containe
         insights_container.info("👋 Click 'Fetch Latest News' to start analyzing!")
         return
     
-    # Latest insights display
     with insights_container:
         st.subheader("💡 Latest Insights")
         for data in reversed(st.session_state.insights_history[-5:]):
             sentiment_colors = {'Positive': '#28a745', 'Negative': '#dc3545', 'Neutral': '#6c757d'}
             color = sentiment_colors.get(data['sentiment'], '#6c757d')
             
-            # --- FIX APPLIED HERE ---
-            # Added the unsafe_allow_html=True parameter to the end of the st.markdown call.
+            # The unsafe_allow_html=True parameter is critical here to render HTML
             st.markdown(f"""
             <div style="border-left: 4px solid {color}; padding: 1rem; margin: 1rem 0; background: #f8f9fa; border-radius: 5px; padding-top: 10px; padding-bottom: 10px;">
                 <h4>{data['title']}</h4>
@@ -138,9 +127,8 @@ def display_insights(insights_container, sentiment_container, companies_containe
                     <p style="margin-top: 5px;">{data['content_preview']}</p>
                 </details>
             </div>
-            """, unsafe_allow_html=True) # <-- THIS PARAMETER FIXES THE ISSUE
+            """, unsafe_allow_html=True) # <-- THIS IS THE CRITICAL FIX
     
-    # Analytics Column (This part is correct and remains unchanged)
     sentiments = [item['sentiment'] for item in st.session_state.insights_history]
     if sentiments:
         with sentiment_container:
@@ -165,17 +153,12 @@ def main():
     """
     st.markdown('<h1 class="main-header">AI Stock Insight Agent</h1>', unsafe_allow_html=True)
     
-    # --- Sidebar Controls ---
     with st.sidebar:
         st.header("⚙️ Control Panel")
         
-        # --- FIX APPLIED HERE ---
-        # Cleaned up the formatting of the dictionary for better readability.
         news_sources = {
-            "Economic Times - Markets": "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
-            "Livemint - Markets": "https://www.livemint.com/rss/markets",
             "ET Markets - Stocks": "https://economictimes.indiatimes.com/markets/stocks/rssfeeds/2146842.cms",
-            "Moneycontrol - Top News": "https://www.moneycontrol.com/rss/MCtopnews.xml"
+            "Moneycontrol - Top News": "https://www.moneycontrol.com/rss/MCtopnews.xml",
         }
         selected_source_name = st.selectbox("📰 News Source", list(news_sources.keys()))
         selected_source_url = news_sources[selected_source_name]
@@ -190,7 +173,6 @@ def main():
         auto_refresh = st.checkbox("Enable Auto-Refresh")
         refresh_interval = st.selectbox("Refresh Interval (seconds)", [60, 180, 300, 600], index=1)
 
-    # --- Main Content Area ---
     col1, col2 = st.columns([3, 1])
     with col1:
         insights_container = st.container()
@@ -199,7 +181,6 @@ def main():
         sentiment_container = st.container()
         companies_container = st.container()
 
-    # --- Auto-Refresh Logic ---
     if auto_refresh:
         if (st.session_state.last_update is None or
             (datetime.now() - st.session_state.last_update).total_seconds() > refresh_interval):
@@ -214,7 +195,6 @@ def main():
         time.sleep(1)
         st.rerun()
 
-    # Display all collected insights
     display_insights(insights_container, sentiment_container, companies_container)
 
 if __name__ == "__main__":
