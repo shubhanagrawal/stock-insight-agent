@@ -4,6 +4,7 @@ import plotly.express as px
 from datetime import datetime, timedelta
 import time
 import logging
+import re
 
 # Make sure these helper files exist and contain the necessary functions
 from scraper import scrape_news
@@ -49,6 +50,16 @@ if 'insights_history' not in st.session_state:
 if 'last_update' not in st.session_state:
     st.session_state.last_update = None
 
+def clean_html(text):
+    """
+    Remove HTML tags and clean up text content.
+    """
+    # Remove HTML tags
+    clean_text = re.sub(r'<[^>]+>', '', text)
+    # Remove extra whitespace
+    clean_text = re.sub(r'\s+', ' ', clean_text)
+    return clean_text.strip()
+
 def fetch_and_analyze_news(source_url, article_limit):
     """
     Main pipeline to fetch, process, and analyze news articles.
@@ -78,6 +89,9 @@ def fetch_and_analyze_news(source_url, article_limit):
                 insight = generate_insight(article['title'], tickers, sentiment_result)
                 logging.info("📊 Final Insight Generated.")
                 
+                # Clean the content preview from HTML tags
+                clean_content = clean_html(article['content'])
+                
                 new_insights.append({
                     'timestamp': datetime.now(),
                     'title': article['title'],
@@ -85,7 +99,7 @@ def fetch_and_analyze_news(source_url, article_limit):
                     'tickers': tickers,
                     'sentiment': sentiment_result['sentiment'],
                     'insight': insight,
-                    'content_preview': article['content'][:200] + "..."
+                    'content_preview': clean_content[:200] + "..." if len(clean_content) > 200 else clean_content
                 })
 
             st.session_state.insights_history.extend(new_insights)
@@ -112,18 +126,24 @@ def display_insights(insights_container, sentiment_container, companies_containe
             sentiment_colors = {'Positive': '#28a745', 'Negative': '#dc3545', 'Neutral': '#6c757d'}
             color = sentiment_colors.get(data['sentiment'], '#6c757d')
             
+            # Escape any remaining HTML characters in the title and content
+            safe_title = data['title'].replace('<', '&lt;').replace('>', '&gt;')
+            safe_content = data['content_preview'].replace('<', '&lt;').replace('>', '&gt;')
+            
             st.markdown(f"""
-            <div style="border-left: 4px solid {color}; padding: 1rem; margin: 1rem 0; background: #f8f9fa; border-radius: 5px; padding-top: 10px; padding-bottom: 10px;">
-                <h4>{data['title']}</h4>
-                <p><strong>🏢 Companies:</strong> {', '.join(data['tickers'].keys())}</p>
-                <p><strong>Sentiment:</strong> <span style="color: {color}; font-weight: bold;">{data['sentiment']}</span></p>
-                <p style="margin-bottom: 10px;"><strong>⏰ Time:</strong> {data['timestamp'].strftime('%H:%M:%S')}</p>
-                
-                <a href="{data['url']}" target="_blank" style="text-decoration: none; font-weight: bold;">🔗 Read Full Article</a>
-                
-                <details style="margin-top: 10px;">
-                    <summary>📄 View Content Preview</summary>
-                    <p style="margin-top: 5px;">{data['content_preview']}</p>
+            <div style="border-left: 4px solid {color}; padding: 1rem; margin: 1rem 0; background: #f8f9fa; border-radius: 5px;">
+                <h4 style="margin-top: 0;">{safe_title}</h4>
+                <p style="margin: 0.5rem 0;"><strong>🏢 Companies:</strong> {', '.join(data['tickers'].keys())}</p>
+                <p style="margin: 0.5rem 0;"><strong>📊 Sentiment:</strong> <span style="color: {color}; font-weight: bold;">{data['sentiment']}</span></p>
+                <p style="margin: 0.5rem 0;"><strong>⏰ Time:</strong> {data['timestamp'].strftime('%H:%M:%S')}</p>
+                <div style="margin-top: 1rem;">
+                    <a href="{data['url']}" target="_blank" style="display: inline-block; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); color: white; padding: 0.5rem 1rem; text-decoration: none; border-radius: 5px; font-weight: bold; transition: opacity 0.3s;">
+                        🔗 Read Full Article
+                    </a>
+                </div>
+                <details style="margin-top: 1rem;">
+                    <summary style="cursor: pointer; font-weight: bold; color: #667eea;">📄 View Content Preview</summary>
+                    <p style="margin-top: 0.5rem; padding: 0.5rem; background: white; border-radius: 5px; line-height: 1.6;">{safe_content}</p>
                 </details>
             </div>
             """, unsafe_allow_html=True)
