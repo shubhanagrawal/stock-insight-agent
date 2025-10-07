@@ -151,7 +151,7 @@ def main():
     """
     Main function to define the Streamlit App layout and logic.
     """
-    st.markdown('<h1 class="main-header">AI Stock Insight Agent</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">AI Stock Insight AgentV2</h1>', unsafe_allow_html=True)
     
     with st.sidebar:
         st.header("⚙️ Control Panel")
