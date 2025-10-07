@@ -1,18 +1,22 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta
-import json
 import time
+import logging
+
+# Make sure these helper files exist and contain the necessary functions
 from scraper import scrape_news
 from nlp_processor import extract_tickers
 from inference_engine import generate_insight, analyze_sentiment
 
+# Set up logging to see the pipeline output in the console
+logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(name)s: %(message)s')
+
 # Page config
 st.set_page_config(
     page_title="AI Stock Insight Agent",
-    page_icon="📊",
+    page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -30,202 +34,177 @@ st.markdown("""
         margin-bottom: 2rem;
     }
     .metric-card {
-        background: white;
+        background: #FFFFFF;
         padding: 1rem;
         border-radius: 10px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         margin: 0.5rem 0;
     }
-    .insight-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 1.5rem;
-        border-radius: 15px;
-        margin: 1rem 0;
-    }
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state
+# Initialize session state to store data across reruns
 if 'insights_history' not in st.session_state:
     st.session_state.insights_history = []
 if 'last_update' not in st.session_state:
     st.session_state.last_update = None
 
-def main():
-    st.markdown('<h1 class="main-header">🎯 AI Stock Insight Agent</h1>', unsafe_allow_html=True)
-    
-    # Sidebar
-    with st.sidebar:
-        st.header("⚙️ Control Panel")
-        
-        # Auto-refresh toggle
-        auto_refresh = st.checkbox("🔄 Auto Refresh", value=False)
-        refresh_interval = st.selectbox("Refresh Interval", [30, 60, 300, 600], index=1)
-        
-        # News source selector
-        news_sources = {
-            "Economic Times - Markets": "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
-            "Business Standard": "https://www.business-standard.com/rss/markets-106.rss",
-        }
-        selected_source = st.selectbox("📰 News Source", list(news_sources.keys()))
-        
-        # Manual refresh button
-        if st.button("🔄 Fetch Latest News", type="primary"):
-            fetch_and_analyze_news()
-        
-        # Settings
-        st.subheader("🎛️ Analysis Settings")
-        max_articles = st.slider("Max Articles", 1, 10, 3)
-        sentiment_threshold = st.slider("Sentiment Confidence", 0.1, 1.0, 0.7)
-    
-    # Main content area
-    col1, col2, col3 = st.columns([2, 1, 1])
-    
-    with col1:
-        st.header("📈 Latest Market Insights")
-        insights_container = st.container()
-    
-    with col2:
-        st.header("📊 Sentiment Analysis")
-        sentiment_container = st.container()
-    
-    with col3:
-        st.header("🏢 Top Companies")
-        companies_container = st.container()
-    
-    # Auto-refresh logic
-    if auto_refresh:
-        if (st.session_state.last_update is None or 
-            (datetime.now() - st.session_state.last_update).seconds > refresh_interval):
-            fetch_and_analyze_news()
-            st.session_state.last_update = datetime.now()
-        
-        # Show countdown
-        if st.session_state.last_update:
-            next_update = st.session_state.last_update + timedelta(seconds=refresh_interval)
-            remaining = (next_update - datetime.now()).seconds
-            st.sidebar.info(f"⏰ Next update in: {remaining}s")
-        
-        time.sleep(1)
-        st.rerun()
-    
-    # Display insights
-    display_insights(insights_container, sentiment_container, companies_container)
-
-def fetch_and_analyze_news():
-    """Fetch and analyze latest news"""
+def fetch_and_analyze_news(source_url, article_limit):
+    """
+    Main pipeline to fetch, process, and analyze news articles.
+    """
+    logging.info("🚀 Starting the AI Insight Agent run...")
     with st.spinner("🔍 Analyzing latest market news..."):
         try:
-            # Fetch news
-            articles = scrape_news(limit=3)
-            
+            # --- STAGE 1: SCRAPING ---
+            articles = scrape_news(url=source_url, limit=article_limit)
             if not articles:
-                st.warning("No articles found")
+                st.warning("Could not fetch any articles.")
+                logging.warning("Could not fetch any articles. Exiting run.")
                 return
-            
+
             new_insights = []
             
+            # --- Process each article found ---
             for article in articles:
-                # Extract tickers
+                logging.info(f"Processing article: \"{article['title']}\"")
+
+                # --- STAGE 2: NLP PROCESSING (Ticker Extraction) ---
                 tickers = extract_tickers(article['content'])
+                if not tickers:
+                    logging.warning("No actionable tickers found. Moving to next article.")
+                    continue
+                logging.info(f"🎯 Tickers Extracted: {tickers}")
+
+                # --- STAGE 3: INFERENCE (Sentiment Analysis) ---
+                sentiment_result = analyze_sentiment(article['content'])
+                logging.info(f"Sentiment analysis complete: {sentiment_result}")
+
+                # --- FINAL STAGE: GENERATE INSIGHT ---
+                insight = generate_insight(article['title'], tickers, sentiment_result)
+                logging.info("📊 Final Insight Generated.")
                 
-                if tickers:
-                    # Analyze sentiment
-                    sentiment = analyze_sentiment(article['content'])
-                    
-                    # Generate insight
-                    insight = generate_insight(article['title'], tickers, sentiment)
-                    
-                    new_insights.append({
-                        'timestamp': datetime.now(),
-                        'title': article['title'],
-                        'url': article['link'],
-                        'tickers': tickers,
-                        'sentiment': sentiment,
-                        'insight': insight,
-                        'content_preview': article['content'][:200] + "..."
-                    })
-            
-            # Add to history
+                new_insights.append({
+                    'timestamp': datetime.now(),
+                    'title': article['title'],
+                    'url': article['link'],
+                    'tickers': tickers,
+                    'sentiment': sentiment_result['sentiment'], # Extract the sentiment string
+                    'insight': insight,
+                    'content_preview': article['content'][:200] + "..."
+                })
+
+            # Add new insights to history and keep the list size manageable
             st.session_state.insights_history.extend(new_insights)
-            
-            # Keep only last 20 insights
             st.session_state.insights_history = st.session_state.insights_history[-20:]
             
-            st.success(f"✅ Analyzed {len(new_insights)} articles")
-            
+            st.success(f"✅ Analyzed {len(new_insights)} new articles.")
+            logging.info("✅ Agent run complete.")
+
         except Exception as e:
-            st.error(f"❌ Error fetching news: {str(e)}")
+            st.error(f"❌ An error occurred: {str(e)}")
+            logging.error(f"An error occurred during the pipeline: {str(e)}")
 
 def display_insights(insights_container, sentiment_container, companies_container):
-    """Display insights and analytics"""
-    
+    """
+    Renders the collected insights and analytics in the UI.
+    """
     if not st.session_state.insights_history:
-        insights_container.info("👋 Click 'Fetch Latest News' to start analyzing market insights!")
+        insights_container.info("👋 Click 'Fetch Latest News' to start analyzing!")
         return
     
-    # Latest insights
+    # Latest insights display
     with insights_container:
-        for i, insight_data in enumerate(reversed(st.session_state.insights_history[-5:])):
-            
-            # Sentiment color mapping
-            sentiment_colors = {
-                'Positive': '#28a745',
-                'Negative': '#dc3545', 
-                'Neutral': '#6c757d'
-            }
-            
-            color = sentiment_colors.get(insight_data['sentiment'], '#6c757d')
+        st.subheader("💡 Latest Insights")
+        for data in reversed(st.session_state.insights_history[-5:]):
+            sentiment_colors = {'Positive': '#28a745', 'Negative': '#dc3545', 'Neutral': '#6c757d'}
+            color = sentiment_colors.get(data['sentiment'], '#6c757d')
             
             st.markdown(f"""
             <div style="border-left: 4px solid {color}; padding-left: 1rem; margin: 1rem 0; background: #f8f9fa; border-radius: 5px;">
-                <h4>📰 {insight_data['title']}</h4>
-                <p><strong>🏢 Companies:</strong> {', '.join([f"{k} ({v})" for k, v in insight_data['tickers'].items()])}</p>
-                <p><strong>😊 Sentiment:</strong> <span style="color: {color}; font-weight: bold;">{insight_data['sentiment']}</span></p>
-                <p><strong>⏰ Time:</strong> {insight_data['timestamp'].strftime('%H:%M:%S')}</p>
+                <h4>{data['title']}</h4>
+                <p><strong>🏢 Companies:</strong> {', '.join(data['tickers'].keys())}</p>
+                <p><strong>Sentiment:</strong> <span style="color: {color}; font-weight: bold;">{data['sentiment']}</span></p>
+                <p><strong>⏰ Time:</strong> {data['timestamp'].strftime('%H:%M:%S')}</p>
                 <details>
                     <summary>🔍 View Details</summary>
-                    <p>{insight_data['content_preview']}</p>
-                    <a href="{insight_data['url']}" target="_blank">🔗 Read Full Article</a>
+                    <p>{data['content_preview']}</p>
+                    <a href="{data['url']}" target="_blank">🔗 Read Full Article</a>
                 </details>
             </div>
             """, unsafe_allow_html=True)
     
-    # Sentiment distribution
-    with sentiment_container:
-        if len(st.session_state.insights_history) > 0:
-            sentiments = [item['sentiment'] for item in st.session_state.insights_history]
+    # Analytics Column
+    sentiments = [item['sentiment'] for item in st.session_state.insights_history]
+    if sentiments:
+        with sentiment_container:
+            st.subheader("Sentiment")
             sentiment_counts = pd.Series(sentiments).value_counts()
-            
-            fig = px.pie(
-                values=sentiment_counts.values,
-                names=sentiment_counts.index,
-                color_discrete_map={
-                    'Positive': '#28a745',
-                    'Negative': '#dc3545',
-                    'Neutral': '#6c757d'
-                }
-            )
-            fig.update_layout(height=300)
+            fig = px.pie(values=sentiment_counts.values, names=sentiment_counts.index,
+                         color_discrete_map={'Positive': '#28a745', 'Negative': '#dc3545', 'Neutral': '#6c757d'})
+            fig.update_layout(height=250, margin=dict(l=0, r=0, t=0, b=0))
             st.plotly_chart(fig, use_container_width=True)
+        
+        with companies_container:
+            st.subheader("Top Companies")
+            all_tickers = [ticker for item in st.session_state.insights_history for ticker in item['tickers'].keys()]
+            if all_tickers:
+                company_counts = pd.Series(all_tickers).value_counts().head(5)
+                for company, count in company_counts.items():
+                    st.markdown(f'<div class="metric-card"><strong>{company}</strong><br>Mentioned {count} times</div>', unsafe_allow_html=True)
+
+def main():
+    """
+    Main function to define the Streamlit App layout and logic.
+    """
+    st.markdown('<h1 class="main-header">AI Stock Insight Agent</h1>', unsafe_allow_html=True)
     
-    # Top companies
-    with companies_container:
-        if len(st.session_state.insights_history) > 0:
-            all_companies = []
-            for item in st.session_state.insights_history:
-                all_companies.extend(item['tickers'].keys())
-            
-            company_counts = pd.Series(all_companies).value_counts().head(5)
-            
-            for company, count in company_counts.items():
-                st.markdown(f"""
-                <div class="metric-card">
-                    <h4>{company}</h4>
-                    <p>Mentioned {count} times</p>
-                </div>
-                """, unsafe_allow_html=True)
+    # --- Sidebar Controls ---
+    with st.sidebar:
+        st.header("⚙️ Control Panel")
+        news_sources = {
+            "Economic Times - Markets": "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
+            "Business Standard": "https://www.business-standard.com/rss/markets-106.rss",
+        }
+        selected_source_name = st.selectbox("📰 News Source", list(news_sources.keys()))
+        selected_source_url = news_sources[selected_source_name]
+
+        st.subheader("🎛️ Analysis Settings")
+        max_articles = st.slider("Max Articles to Process", 1, 10, 3)
+
+        if st.button("🔄 Fetch Latest News", type="primary"):
+            fetch_and_analyze_news(selected_source_url, max_articles)
+        
+        st.subheader("⚙️ Auto-Refresh")
+        auto_refresh = st.checkbox("Enable Auto-Refresh")
+        refresh_interval = st.selectbox("Refresh Interval (seconds)", [60, 180, 300, 600], index=1)
+
+    # --- Main Content Area ---
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        insights_container = st.container()
+    with col2:
+        st.header("📊 At a Glance")
+        sentiment_container = st.container()
+        companies_container = st.container()
+
+    # --- Auto-Refresh Logic ---
+    if auto_refresh:
+        if (st.session_state.last_update is None or
+            (datetime.now() - st.session_state.last_update).total_seconds() > refresh_interval):
+            fetch_and_analyze_news(selected_source_url, max_articles)
+            st.session_state.last_update = datetime.now()
+        
+        if st.session_state.last_update:
+            next_update_time = st.session_state.last_update + timedelta(seconds=refresh_interval)
+            remaining_seconds = max(0, (next_update_time - datetime.now()).total_seconds())
+            st.sidebar.info(f"Next refresh in: {int(remaining_seconds)}s")
+        
+        time.sleep(1)
+        st.rerun()
+
+    # Display all collected insights
+    display_insights(insights_container, sentiment_container, companies_container)
 
 if __name__ == "__main__":
     main()

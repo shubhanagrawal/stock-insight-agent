@@ -80,7 +80,9 @@ class AdvancedSentimentAnalyzer:
             score += count * weight
         
         # Normalize by text length
-        normalized_score = score / max(word_count, 1) * 100
+        # FIX 1: Reduced multiplier from 100 to 10. The original value caused the score
+        # to saturate at -1 or 1 too quickly, losing nuance. This provides a more granular score.
+        normalized_score = score / max(word_count, 1) * 10
         return np.tanh(normalized_score)  # Bounded between -1 and 1
     
     def _get_impact_multiplier(self, text):
@@ -113,10 +115,18 @@ class TradingSignalGenerator:
         # Price momentum signal
         if stock_data:
             momentum_signal = self._price_momentum_signal(stock_data)
-            signals['momentum'] = momentum_signal
+            # FIX 2: Changed key from 'momentum' to 'price_momentum' to match the
+            # self.signal_weights dictionary. This ensures the correct weight (0.3) is applied.
+            signals['price_momentum'] = momentum_signal
             
             # Volume signal
             volume_signal = self._volume_signal(stock_data)
+            
+            # FIX 3: Made volume directional. Raw volume is just magnitude, but for a trading
+            # signal, it should be negative on down days and positive on up days.
+            if momentum_signal != 0:
+                volume_signal *= np.sign(momentum_signal)
+
             signals['volume'] = volume_signal
         
         # Technical signal (if available)
@@ -263,5 +273,86 @@ class NewsImpactCalculator:
         category_multiplier = 1.0
         detected_categories = []
         
+        # This 'for' loop contains the line that was previously incomplete and causing the error
         for category, info in self.impact_categories.items():
-            if any(keyword in
+            if any(keyword in text for keyword in info['keywords']):
+                category_multiplier = max(category_multiplier, info['multiplier'])
+                detected_categories.append(category)
+        
+        # Final impact score
+        impact_score = base_impact * category_multiplier
+
+        return {
+            'impact_score': impact_score,
+            'base_sentiment_confidence': base_impact,
+            'category_multiplier': category_multiplier,
+            'detected_categories': detected_categories if detected_categories else ['general']
+        }
+
+if __name__ == "__main__":
+    # --- 1. Instantiate Analyzers ---
+    sentiment_analyzer = AdvancedSentimentAnalyzer()
+    signal_generator = TradingSignalGenerator()
+    impact_calculator = NewsImpactCalculator()
+
+    # --- 2. Sample Data ---
+    # Sample News Article
+    news_title = "TechCorp Inc. Announces Record Quarterly Earnings, Exceeding Forecasts"
+    news_content = """
+    TechCorp Inc. today reported a massive profit for the fourth quarter, with revenue growth surging by 25%.
+    This success is attributed to the recent launch of their innovative product line and a major acquisition.
+    The company's outlook for the next annual period is extremely positive. However, some analysts express concern over rising debt levels.
+    """
+
+    # Sample Stock Data for the Day
+    stock_data = {'change_percent': 3.5, 'volume': 1_200_000}
+
+    # Sample Technical Data (e.g., from a library like TA-Lib)
+    technical_data = pd.DataFrame({
+        'Date': [datetime.now() - timedelta(days=1)],
+        'Close': [155.0],
+        'RSI': [65.0],  # Neither overbought nor oversold
+        'MA_20': [152.0],
+        'MA_50': [148.0]
+    })
+
+    # --- 3. Run Analysis ---
+    print("📰 ANALYZING NEWS ARTICLE...")
+    # Analyze sentiment of the news
+    sentiment_result = sentiment_analyzer.analyze_advanced_sentiment(news_title + " " + news_content)
+    
+    # Calculate the news impact
+    impact_result = impact_calculator.calculate_impact_score(news_title, news_content, sentiment_result)
+    
+    # Generate a trading signal based on all available data
+    trading_signal = signal_generator.generate_trading_signal(sentiment_result, stock_data, technical_data)
+    
+    # --- 4. Display Results ---
+    print("\n" + "="*50)
+    print("📊 SENTIMENT ANALYSIS RESULTS")
+    print("-"*50)
+    print(f"  Sentiment: {sentiment_result['sentiment']}")
+    print(f"  Confidence Score: {sentiment_result['confidence']:.4f}")
+    print(f"  Raw Score: {sentiment_result['raw_score']:.4f}")
+    print(f"  Keyword Contribution: {sentiment_result['keyword_contribution']:.4f}")
+    print(f"  TextBlob Contribution: {sentiment_result['textblob_contribution']:.4f}")
+    print(f"  Impact Multiplier: {sentiment_result['impact_multiplier']:.2f}")
+
+    print("\n" + "="*50)
+    print("💥 NEWS IMPACT ASSESSMENT")
+    print("-"*50)
+    print(f"  Detected Categories: {', '.join(impact_result['detected_categories'])}")
+    print(f"  Category Multiplier: {impact_result['category_multiplier']:.2f}")
+    print(f"  Final Impact Score: {impact_result['impact_score']:.4f} (out of a max determined by the multiplier)")
+
+    print("\n" + "="*50)
+    print("📈 TRADING SIGNAL & RECOMMENDATION")
+    print("-"*50)
+    print(f"  Overall Signal: {trading_signal['overall_signal']:.4f} (from -1 to 1)")
+    print(f"  Signal Strength: {trading_signal['signal_strength']:.4f}")
+    print(f"  System Confidence: {trading_signal['confidence_level']:.4f}")
+    print(f"  RECOMMENDATION: ** {trading_signal['recommendation']} **")
+    print("\n  --- Signal Breakdown ---")
+    for source, value in trading_signal['individual_signals'].items():
+        print(f"    - {source.replace('_', ' ').capitalize()} Signal: {value:.4f}")
+    print("="*50)

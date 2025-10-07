@@ -40,7 +40,7 @@ def extract_tickers(text):
 
         # --- Step 1: Always call the LLM to get potential companies ---
         response = client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="qwen/qwen3-32b",
             messages=[{"role": "user", "content": full_prompt}],
             temperature=0.1,
             response_format={"type": "json_object"}
