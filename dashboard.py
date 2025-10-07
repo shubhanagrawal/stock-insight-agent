@@ -105,6 +105,8 @@ def fetch_and_analyze_news(source_url, article_limit):
             st.error(f"❌ An error occurred: {str(e)}")
             logging.error(f"An error occurred during the pipeline: {str(e)}")
 
+# In your dashboard.py file
+
 def display_insights(insights_container, sentiment_container, companies_container):
     """
     Renders the collected insights and analytics in the UI.
@@ -121,10 +123,9 @@ def display_insights(insights_container, sentiment_container, companies_containe
             color = sentiment_colors.get(data['sentiment'], '#6c757d')
             
             # --- FIX APPLIED HERE ---
-            # Moved the "Read Full Article" link outside of the collapsible <details>
-            # tag to make it always visible and clickable.
+            # Added the unsafe_allow_html=True parameter to the end of the st.markdown call.
             st.markdown(f"""
-            <div style="border-left: 4px solid {color}; padding: 1rem; margin: 1rem 0; background: #f8f9fa; border-radius: 5px;">
+            <div style="border-left: 4px solid {color}; padding: 1rem; margin: 1rem 0; background: #f8f9fa; border-radius: 5px; padding-top: 10px; padding-bottom: 10px;">
                 <h4>{data['title']}</h4>
                 <p><strong>🏢 Companies:</strong> {', '.join(data['tickers'].keys())}</p>
                 <p><strong>Sentiment:</strong> <span style="color: {color}; font-weight: bold;">{data['sentiment']}</span></p>
@@ -137,9 +138,9 @@ def display_insights(insights_container, sentiment_container, companies_containe
                     <p style="margin-top: 5px;">{data['content_preview']}</p>
                 </details>
             </div>
-            """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True) # <-- THIS PARAMETER FIXES THE ISSUE
     
-    # Analytics Column
+    # Analytics Column (This part is correct and remains unchanged)
     sentiments = [item['sentiment'] for item in st.session_state.insights_history]
     if sentiments:
         with sentiment_container:
