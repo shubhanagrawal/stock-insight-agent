@@ -120,16 +120,21 @@ def display_insights(insights_container, sentiment_container, companies_containe
             sentiment_colors = {'Positive': '#28a745', 'Negative': '#dc3545', 'Neutral': '#6c757d'}
             color = sentiment_colors.get(data['sentiment'], '#6c757d')
             
+            # --- FIX APPLIED HERE ---
+            # Moved the "Read Full Article" link outside of the collapsible <details>
+            # tag to make it always visible and clickable.
             st.markdown(f"""
-            <div style="border-left: 4px solid {color}; padding-left: 1rem; margin: 1rem 0; background: #f8f9fa; border-radius: 5px;">
+            <div style="border-left: 4px solid {color}; padding: 1rem; margin: 1rem 0; background: #f8f9fa; border-radius: 5px;">
                 <h4>{data['title']}</h4>
                 <p><strong>🏢 Companies:</strong> {', '.join(data['tickers'].keys())}</p>
                 <p><strong>Sentiment:</strong> <span style="color: {color}; font-weight: bold;">{data['sentiment']}</span></p>
-                <p><strong>⏰ Time:</strong> {data['timestamp'].strftime('%H:%M:%S')}</p>
-                <details>
-                    <summary>🔍 View Details</summary>
-                    <p>{data['content_preview']}</p>
-                    <a href="{data['url']}" target="_blank">🔗 Read Full Article</a>
+                <p style="margin-bottom: 10px;"><strong>⏰ Time:</strong> {data['timestamp'].strftime('%H:%M:%S')}</p>
+                
+                <a href="{data['url']}" target="_blank" style="text-decoration: none; font-weight: bold;">🔗 Read Full Article</a>
+                
+                <details style="margin-top: 10px;">
+                    <summary>📄 View Content Preview</summary>
+                    <p style="margin-top: 5px;">{data['content_preview']}</p>
                 </details>
             </div>
             """, unsafe_allow_html=True)
@@ -162,10 +167,12 @@ def main():
     # --- Sidebar Controls ---
     with st.sidebar:
         st.header("⚙️ Control Panel")
+        
+        # --- FIX APPLIED HERE ---
+        # Cleaned up the formatting of the dictionary for better readability.
         news_sources = {
             "Economic Times - Markets": "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
-            "Livemint - Markets": "https://www.livemint.com/rss/markets"
-            ,
+            "Livemint - Markets": "https://www.livemint.com/rss/markets",
             "ET Markets - Stocks": "https://economictimes.indiatimes.com/markets/stocks/rssfeeds/2146842.cms",
             "Moneycontrol - Top News": "https://www.moneycontrol.com/rss/MCtopnews.xml"
         }
