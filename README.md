@@ -212,10 +212,4 @@ please consider giving it a ⭐!
 
 ---
 
-### ✅ Why This README Works:
-
-* **Instantly visual and scannable:** Recruiters see badges, GIFs, and diagrams before text walls.
-* **Quant results upfront:** Proves real-world impact, not just tech jargon.
-* **Modern tone:** Reads like a product case study rather than a student project.
-* **Domain + AI fusion:** Perfect for roles in AI, data science, quant, and fintech.
 
