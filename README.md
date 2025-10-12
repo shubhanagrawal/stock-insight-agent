@@ -76,7 +76,7 @@ The system continuously performs this loop:
 | **Backtesting**   | pandas-ta / custom comparison scripts            |
 
 
-
+```mermaid
 flowchart LR
   subgraph DataSources [Data Sources]
     A1(News RSS & Scrapers)
