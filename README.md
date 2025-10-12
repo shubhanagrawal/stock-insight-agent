@@ -75,7 +75,67 @@ The system continuously performs this loop:
 | **Orchestration** | dotenv, requests                                 |
 | **Backtesting**   | pandas-ta / custom comparison scripts            |
 
----
+
+
+flowchart LR
+  subgraph DataSources [Data Sources]
+    A1(News RSS & Scrapers)
+    A2(Social Media / Twitter)
+    A3(Market Data - yfinance / APIs)
+    A4(NSE Stock List CSV)
+  end
+
+  subgraph Ingest ["Ingest Layer"]
+    B1(Feed Parser & Scraper)
+    B2(Preprocessor: clean / dedupe / normalize)
+  end
+
+  subgraph NLP ["NLP & Validation"]
+    C1(spaCy NER)
+    C2(Ticker Validator -> NSE List)
+    C3(FinBERT Sentiment)
+  end
+
+  subgraph Storage ["Storage & DB"]
+    D1(SQLite / Postgres)
+    D2(Insights Table)
+    D3(Raw Articles Table)
+  end
+
+  subgraph Analytics ["Analytics & Backtesting"]
+    E1(Backtester Module)
+    E2(Performance Metrics DB)
+    E3(Strategy Simulator)
+  end
+
+  subgraph UI ["Visualization / Orchestration"]
+    F1(Streamlit Dashboard)
+    F2(Task Queue (Celery) - optional)
+    F3(Docker / CI-CD)
+  end
+
+  %% connections
+  A1 --> B1
+  A2 --> B1
+  A3 --> B1
+  A4 --> C2
+
+  B1 --> B2
+  B2 --> C1
+  C1 --> C2
+  C2 --> C3
+  C3 --> D1
+
+  D1 --> E1
+  E1 --> E2
+  E2 --> F1
+
+  F1 -->|user| User[(Recruiter / Analyst)]
+
+  F2 --> B1
+  F3 --> F1
+  F3 --> E1
+
 
 ## 🧰 Installation Guide
 
