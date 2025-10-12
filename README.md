@@ -198,7 +198,7 @@ AI Stock Insight Agent – Real-time NLP-powered Market Sentiment Analyzer for I
 💼 Data Science | NLP | Quantitative Finance | AI Systems
 🔗 [GitHub](https://github.com/shubhanagrawal) · [LinkedIn](https://linkedin.com/in/shubhanagrawal)
 
----
+
 
 ## ⭐ Star This Repo
 
@@ -208,8 +208,7 @@ please consider giving it a ⭐!
 <p align="center">
   <img src="https://img.shields.io/github/stars/shubhanagrawal/stock-insight-agent?style=social" />
 </p>
-```
 
----
+
 
 
