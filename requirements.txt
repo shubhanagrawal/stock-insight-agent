@@ -15,3 +15,9 @@ textblob
 
 # For loading environment variables (API keys)
 python-dotenv
+
+spacy
+groq
+spacy-transformers
+transformers
+yfinance
