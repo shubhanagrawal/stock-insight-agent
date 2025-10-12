@@ -1,7 +1,6 @@
 AI Stock Insight Agent – Real-time NLP-powered Market Sentiment Analyzer for Indian Stocks
----
 
-```markdown
+
 <!-- PROJECT HEADER -->
 <p align="center">
   <img src="https://img.shields.io/badge/Domain-FinTech-blue?style=for-the-badge" />
@@ -220,5 +219,3 @@ please consider giving it a ⭐!
 * **Modern tone:** Reads like a product case study rather than a student project.
 * **Domain + AI fusion:** Perfect for roles in AI, data science, quant, and fintech.
 
-Would you like me to create a **matching visual architecture diagram (PNG/SVG)** and a **dashboard preview mockup** for your repo banner section next?
-That’s what makes the first 5 seconds of your GitHub profile unforgettable.
