@@ -1,23 +1,14 @@
-# Core app and data handling
+# In your new requirements.txt file
 streamlit
 pandas
-
-# Plotting
 plotly
-
-# Web scraping and RSS feeds
+# Use a specific, stable version of protobuf
+protobuf==3.20.0
+# Lock numpy to a version before the breaking 2.0 release
+numpy<2.0
+yfinance
 feedparser
 requests
 beautifulsoup4
-
-# NLP and sentiment analysis
-textblob
-
-# For loading environment variables (API keys)
 python-dotenv
-
 spacy
-groq
-spacy-transformers
-transformers
-yfinance
