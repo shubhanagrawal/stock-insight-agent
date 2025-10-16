@@ -1,86 +1,226 @@
-# AI Stock Insight Agent for the Indian Market 🇮🇳
 
-**An autonomous agent that analyzes real-time financial news from the Indian market and converts it into actionable investment insights.**
+# 💹 AI Stock Insight Agent – Real-time NLP-powered Market Sentiment Analyzer for Indian Stocks 🇮🇳
 
----
-
-**[➡️ View the Live Demo Here]** `(Link to your deployed Streamlit app)`
-
-![GIF of the app in action] `(HIGHLY RECOMMENDED: Record a short GIF of your app and add it here)`
+**An autonomous AI system that ingests, analyzes, and quantifies real-time Indian financial news — transforming unstructured market data into validated, data-driven investment insights.**
 
 ---
 
-## 🎯 The Problem
+## 🌐 [🎥 Live Demo (Streamlit App)](https://your-demo-link-here.com)
 
-The financial news cycle is a firehose of information. For any investor, the challenge isn't finding news; it's finding the **signal within the noise**. A single headline about a company's earnings, a promoter's stake sale, or a new contract can have a significant market impact, but it's buried among dozens of other, less important articles.
+*(💡 Tip: Upload a short demo GIF in `/assets/demo.gif` and embed it below for maximum visual impact)*
 
-This project builds an AI agent to solve this problem. It autonomously monitors the news, identifies the key players, understands the sentiment, and generates a concise, analytical insight, mimicking the workflow of a junior financial analyst.
+```markdown
+![AI Stock Insight Demo](assets/demo.gif)
+```
 
-## ✨ Features
+---
 
-* **Automated News Scraping:** The agent monitors the Economic Times RSS feed for the latest market news.
-* **Hybrid Ticker Extraction:** It uses a robust, two-step process to identify companies:
-    1.  **Local Knowledge Base:** A high-speed check against a manually curated list of prominent Indian companies for maximum accuracy.
-    2.  **LLM Fallback:** If a company isn't in the local list, it uses the Groq API (running Llama 3) to perform advanced entity recognition, allowing it to identify new or less common companies.
-* **Sentiment Analysis:** It leverages a `FinBERT` model, specifically fine-tuned for financial text, to accurately classify news headlines as `Positive`, `Negative`, or `Neutral`.
-* **Insight Generation:** It synthesizes all the gathered information into a clean, human-readable "Insight Card" that summarizes the potential impact on the identified company.
+## 🎯 Problem Statement
 
-## ⚙️ System Architecture
+Financial news is abundant — but actionable insights are buried in noise.
+This project solves that by building an **AI agent** that behaves like a **junior financial analyst**:
+it reads, comprehends, analyzes, and reports **market-moving** information — autonomously.
 
-The agent operates on a simple, 4-stage pipeline:
+---
 
-`Scrape News -> Extract Tickers -> Analyze Sentiment -> Generate Insight`
+## ⚙️ System Overview
 
-![A simple flowchart showing the 4 stages of the pipeline] 
+The system continuously performs this loop:
+**Ingest → Process (NLP) → Store → Backtest → Visualize**
 
-### **Tech Stack**
+✅ Fetches and cleans real-time financial news (NSE/BSE, MoneyControl, ET, Mint)
+✅ Extracts company tickers with high accuracy (NER + NSE validation)
+✅ Evaluates sentiment using `FinBERT` (financially tuned BERT model)
+✅ Persists all results to SQLite for historical tracking
+✅ Backtests prediction validity against stock price data (`yfinance`)
+✅ Displays real-time and historical insights on an interactive Streamlit dashboard
 
-* **Data Acquisition:** `requests`, `feedparser`, `beautifulsoup4`
-* **Core NLP & Inference:**
-    * **Entity Extraction:** Groq API (Llama 3 8B)
-    * **Sentiment Analysis:** Hugging Face Inference API (ProsusAI/finbert)
-* **Orchestration & UI:** Python, Streamlit
-* **Environment:** `python-dotenv` for managing API keys
+---
 
-## 🚀 How to Run It Locally
+## ✨ Key Features
 
-1.  **Clone the repository:**
-    ```bash
-    git clone [https://github.com/shubhanagrawal/stock-insight-agent.git](https://github.com/shubhanagrawal/stock-insight-agent.git)
-    cd stock-insight-agent
-    ```
+| Feature                                      | Description                                                        |
+| -------------------------------------------- | ------------------------------------------------------------------ |
+| 📰 **Multi-source News Ingestion**           | Curated RSS and web feeds from top Indian financial sources        |
+| 🏷️ **Ticker Extraction (NER + Validation)** | spaCy NER + cross-check with official NSE stock list               |
+| 🤖 **Financial Sentiment Analysis**          | FinBERT model (Hugging Face) for context-aware financial sentiment |
+| 💾 **Persistent Data Storage**               | SQLite-based local database for all insights                       |
+| 📊 **Quantitative Backtesting Engine**       | Validates model predictions vs. real stock performance             |
+| 🧠 **Streamlit Dashboard**                   | Interactive real-time visualization of sentiment trends            |
 
-2.  **Set up a Python virtual environment:**
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-    ```
+---
 
-3.  **Install the dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+## 📈 Example Quantitative Results
 
-4.  **Create your `.env` file:**
-    * Create a file named `.env` in the root of the project.
-    * Add your API keys to this file:
-        ```
-        GROQ_API_KEY="YOUR_GROQ_KEY_HERE"
-        HUGGINGFACE_API_TOKEN="YOUR_HUGGINGFACE_TOKEN_HERE"
-        ```
+| Ticker     | Date       | Predicted Sentiment | Next Day Return | Correct? |
+| ---------- | ---------- | ------------------- | --------------- | -------- |
+| BAJFINANCE | 2025-10-06 | Positive            | +0.76%          | ✅        |
+| RELIANCE   | 2025-10-07 | Positive            | -0.21%          | ❌        |
+| INFY       | 2025-10-08 | Negative            | -1.15%          | ✅        |
 
-5.  **Run the command-line version:**
-    ```bash
-    python app.py
-    ```
+> An **accuracy >50%** over a large sample indicates a **statistically meaningful predictive edge**.
 
-6.  **Launch the Web Dashboard:**
-    ```bash
-    streamlit run dashboard.py
-    ```
+---
 
-## 🔮 Future Improvements
+## 🧩 Tech Stack
 
-* **Sophisticated Rationale:** Upgrade the inference engine to generate a more detailed rationale for its insights instead of a static sentence.
-* **Vector Database for Similarity:** Store article embeddings in a vector DB to find related news or detect recurring themes over time.
-* **Portfolio Simulation:** Allow users to input a hypothetical portfolio and see which of their stocks were mentioned in the latest news cycle.
+| Layer             | Technologies                                     |
+| ----------------- | ------------------------------------------------ |
+| **Frontend**      | Streamlit                                        |
+| **Backend**       | Python                                           |
+| **NLP & AI**      | spaCy (`en_core_web_lg`), FinBERT (Hugging Face) |
+| **Data Handling** | Pandas, BeautifulSoup, Feedparser                |
+| **Finance APIs**  | yFinance                                         |
+| **Database**      | SQLite                                           |
+| **Orchestration** | dotenv, requests                                 |
+| **Backtesting**   | pandas-ta / custom comparison scripts            |
+
+
+```mermaid
+flowchart LR
+  subgraph DataSources [Data Sources]
+    A1(News RSS & Scrapers)
+    A2(Social Media / Twitter)
+    A3(Market Data - yfinance / APIs)
+    A4(NSE Stock List CSV)
+  end
+
+  subgraph Ingest ["Ingest Layer"]
+    B1(Feed Parser & Scraper)
+    B2(Preprocessor: clean / dedupe / normalize)
+  end
+
+  subgraph NLP ["NLP & Validation"]
+    C1(spaCy NER)
+    C2(Ticker Validator -> NSE List)
+    C3(FinBERT Sentiment)
+  end
+
+  subgraph Storage ["Storage & DB"]
+    D1(SQLite / Postgres)
+    D2(Insights Table)
+    D3(Raw Articles Table)
+  end
+
+  subgraph Analytics ["Analytics & Backtesting"]
+    E1(Backtester Module)
+    E2(Performance Metrics DB)
+    E3(Strategy Simulator)
+  end
+
+  subgraph UI ["Visualization / Orchestration"]
+    F1(Streamlit Dashboard)
+    F2(Task Queue (Celery) - optional)
+    F3(Docker / CI-CD)
+  end
+
+  %% connections
+  A1 --> B1
+  A2 --> B1
+  A3 --> B1
+  A4 --> C2
+
+  B1 --> B2
+  B2 --> C1
+  C1 --> C2
+  C2 --> C3
+  C3 --> D1
+
+  D1 --> E1
+  E1 --> E2
+  E2 --> F1
+
+  F1 -->|user| User[(Recruiter / Analyst)]
+
+  F2 --> B1
+  F3 --> F1
+  F3 --> E1
+
+
+## 🧰 Installation Guide
+
+1️⃣ **Clone the repository**
+
+```bash
+git clone https://github.com/shubhanagrawal/stock-insight-agent.git
+cd stock-insight-agent
+```
+
+2️⃣ **Set up virtual environment**
+
+```bash
+python -m venv venv
+source venv/bin/activate   # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+3️⃣ **Download the NLP model**
+
+```bash
+python -m spacy download en_core_web_lg
+```
+
+4️⃣ **Prepare environment**
+Create a `.env` file in the root folder:
+
+```
+HUGGINGFACE_API_TOKEN=your_huggingface_token
+```
+
+5️⃣ **Run the Streamlit dashboard**
+
+```bash
+streamlit run dashboard.py
+```
+
+6️⃣ **(Optional) Run the backtester**
+
+```bash
+python backtester.py
+```
+
+---
+
+## 🚀 Future Enhancements
+
+* [ ] **Celery + Redis Integration:** Move analysis to async background tasks
+* [ ] **Dockerization:** Deploy in a portable, production-ready container
+* [ ] **PostgreSQL Migration:** Scale data storage beyond SQLite
+* [ ] **Auto Stock Watchlist Generator:** Dynamically track trending tickers
+* [ ] **LLM Integration:** Summarize market news in human-readable insights
+
+---
+
+## 🧠 Why This Project Stands Out
+
+This project demonstrates:
+
+* **AI + Finance understanding** — bridging NLP with quantitative validation
+* **End-to-End Product Design** — from ingestion to visualization
+* **Quantitative rigor** — validated model accuracy, not just text processing
+* **Professional-grade modular code** — maintainable, extensible, and reproducible
+
+---
+
+## 👤 Author
+
+**Shubhan Agrawal**
+🎓 B.Tech CSE, MIT World Peace University, Pune
+💼 Data Science | NLP | Quantitative Finance | AI Systems
+🔗 [GitHub](https://github.com/shubhanagrawal) • [LinkedIn](https://linkedin.com/in/shubhanagrawal)
+
+
+
+## ⭐ Star This Repo
+
+If this project inspired you or showcased useful ideas — please consider giving it a ⭐!
+
+<p align="center">
+  <img src="https://img.shields.io/github/stars/shubhanagrawal/stock-insight-agent?style=social" />
+</p>
+
+
+
+Where AI meets Market Intelligence — turning news into numbers.
+
+
