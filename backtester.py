@@ -1,20 +1,21 @@
-# backtester.py
 import sqlite3
 import pandas as pd
 import yfinance as yf
 from datetime import datetime, timedelta
 import logging
 
-# Configure logging for a clean report
+# --- Configuration ---
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
-
 DB_FILE = "insights.db"
+TRANSACTION_COST_PERCENT = 0.2
+BENCHMARK_TICKER = "^NSEI" # Nifty 50 Index
 
-# In your backtester.py file
+# In backtester.py
 
 def run_backtest():
     """
-    Performs a backtest of the sentiment predictions stored in the database.
+    Performs a rigorous backtest by measuring Alpha, with robust data handling
+    for both the stock and the benchmark index.
     """
     try:
         conn = sqlite3.connect(DB_FILE)
@@ -27,84 +28,78 @@ def run_backtest():
         return
 
     if df.empty:
-        logging.warning("No insights older than 3 days were found to backtest. Collect more data over time.")
+        logging.warning("No insights old enough to backtest were found.")
         return
 
-    logging.info(f"Loaded {len(df)} insights for backtesting.")
-
-    correct_predictions = 0
-    total_predictions = 0
-    results = []
+    correct_predictions, total_predictions, results = 0, 0, []
 
     for index, row in df.iterrows():
-        ticker = row['ticker']
-        prediction_date = datetime.fromisoformat(row['timestamp']).date()
-        sentiment = row['sentiment']
+        ticker, prediction_date_str, sentiment = row['ticker'], row['timestamp'], row['sentiment']
+        if sentiment == 'Neutral': continue
 
-        if sentiment == 'Neutral':
-            continue
-
+        prediction_date = pd.to_datetime(prediction_date_str).date()
         yahoo_ticker = f"{ticker}.NS"
-        
         try:
-            start_date = prediction_date
-            end_date = start_date + timedelta(days=5)
+            start_date = prediction_date - timedelta(days=5)
+            end_date = prediction_date + timedelta(days=5)
+            
             stock_data = yf.download(yahoo_ticker, start=start_date, end=end_date, progress=False)
+            benchmark_data = yf.download(BENCHMARK_TICKER, start=start_date, end=end_date, progress=False)
+
+            if stock_data.empty or benchmark_data.empty: continue
+
+            actual_prediction_date = stock_data.index.asof(pd.to_datetime(prediction_date))
+            if pd.isna(actual_prediction_date): continue
             
-            if len(stock_data) < 2:
-                logging.warning(f"Not enough historical data for {ticker} on {prediction_date}")
+            prediction_day_index = stock_data.index.get_loc(actual_prediction_date)
+            if prediction_day_index == 0 or prediction_day_index >= len(stock_data) - 1: continue
+
+            # --- ROBUST DATA SELECTION FOR BOTH STOCK AND BENCHMARK ---
+            stock_close_series = stock_data['Close']
+            if isinstance(stock_close_series, pd.DataFrame):
+                stock_close_series = stock_close_series.iloc[:, 0]
+            
+            benchmark_close_series = benchmark_data['Close']
+            if isinstance(benchmark_close_series, pd.DataFrame):
+                benchmark_close_series = benchmark_close_series.iloc[:, 0]
+            # -----------------------------------------------------------
+
+            stock_prev_close = stock_close_series.iloc[prediction_day_index - 1]
+            stock_next_close = stock_close_series.iloc[prediction_day_index + 1]
+            stock_return = ((stock_next_close - stock_prev_close) / stock_prev_close) * 100
+
+            benchmark_prev_close = benchmark_close_series.asof(stock_data.index[prediction_day_index - 1])
+            benchmark_next_close = benchmark_close_series.asof(stock_data.index[prediction_day_index + 1])
+            
+            if pd.isna(benchmark_prev_close) or pd.isna(benchmark_next_close) or benchmark_prev_close == 0:
                 continue
 
-            # --- FIX APPLIED HERE ---
-            # This robustly handles cases where yfinance returns duplicate columns.
-            open_prices = stock_data['Open']
-            if isinstance(open_prices, pd.DataFrame):
-                # If we get a DataFrame, use the first column by position
-                next_day_open = open_prices.iloc[1, 0]
-            else: # It's a Series, as normally expected
-                next_day_open = open_prices.iloc[1]
-
-            close_prices = stock_data['Close']
-            if isinstance(close_prices, pd.DataFrame):
-                next_day_close = close_prices.iloc[1, 0]
-            else:
-                next_day_close = close_prices.iloc[1]
-            # --------------------------
+            benchmark_return = ((benchmark_next_close - benchmark_prev_close) / benchmark_prev_close) * 100
             
-            # Ensure we have valid numbers before calculating
-            if pd.isna(next_day_open) or pd.isna(next_day_close) or next_day_open == 0:
-                logging.warning(f"Missing price data for {ticker} on the next trading day.")
-                continue
+            alpha = stock_return - benchmark_return
+            net_alpha = alpha - TRANSACTION_COST_PERCENT
 
-            daily_return = ((next_day_close - next_day_open) / next_day_open) * 100
-            actual_movement = "Positive" if daily_return > 0 else "Negative"
+            actual_movement = "Positive" if net_alpha > 0 else "Negative"
             is_correct = (sentiment == actual_movement)
 
-            if is_correct:
-                correct_predictions += 1
-            
+            if is_correct: correct_predictions += 1
             total_predictions += 1
-            results.append([ticker, prediction_date, sentiment, f"{daily_return:.2f}%", is_correct])
+            results.append([ticker, prediction_date, sentiment, f"{net_alpha:.2f}%", is_correct])
 
         except Exception as e:
-            logging.error(f"Could not process ticker {ticker}: {e}")
+            logging.error(f"Could not process backtest for ticker {ticker}: {e}", exc_info=True)
 
-    # The report section remains the same
+    # --- Display Final Report (unchanged) ---
     print("\n" + "="*60)
-    print("              SENTIMENT AGENT BACKTESTING REPORT")
+    print("              ALPHA BACKTESTING REPORT")
     print("="*60)
-
     if total_predictions > 0:
-        report_df = pd.DataFrame(results, columns=["Ticker", "Date", "Prediction", "Next Day Return", "Correct?"])
+        report_df = pd.DataFrame(results, columns=["Ticker", "Date", "Prediction", "Net Alpha", "Correct?"])
         print(report_df.to_string())
-        
         accuracy = (correct_predictions / total_predictions) * 100
-        print("\n" + "-"*60)
-        print(f"Overall Accuracy: {accuracy:.2f}% ({correct_predictions} correct out of {total_predictions})")
-        print("-" * 60)
+        print(f"\nOverall Accuracy (Based on Alpha): {accuracy:.2f}% ({correct_predictions} correct out of {total_predictions})")
     else:
-        print("No actionable (Positive/Negative) insights older than 3 days were found to evaluate.")
-# --- THIS IS THE CRITICAL PART THAT WAS MISSING ---
+        print("No actionable (Positive/Negative) insights were found to evaluate.")
+
 if __name__ == "__main__":
     run_backtest()
-# --------------------------------------------------
