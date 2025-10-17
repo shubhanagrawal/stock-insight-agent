@@ -1,9 +1,12 @@
 
+
 # 💹 AI Stock Insight Agent – Real-time NLP-powered Market Sentiment Analyzer for Indian Stocks 🇮🇳
 
-**An autonomous AI system that ingests, analyzes, and quantifies real-time Indian financial news — transforming unstructured market data into validated, data-driven investment insights.**
+   
 
----
+**An autonomous AI system that ingests and analyzes real-time Indian financial news, leveraging a knowledge graph and statistical validation to transform unstructured market data into structured, actionable insights.**
+
+-----
 
 ## 🌐 [🎥 Live Demo (Streamlit App)](https://your-demo-link-here.com)
 
@@ -13,214 +16,121 @@
 ![AI Stock Insight Demo](assets/demo.gif)
 ```
 
----
+-----
 
 ## 🎯 Problem Statement
 
-Financial news is abundant — but actionable insights are buried in noise.
-This project solves that by building an **AI agent** that behaves like a **junior financial analyst**:
-it reads, comprehends, analyzes, and reports **market-moving** information — autonomously.
+Financial news is abundant, but actionable insights are buried in noise. Retail and professional investors alike face the challenge of sifting through hundreds of daily articles to find the **signal** that could impact their portfolio.
 
----
+This project solves that by building an AI agent that emulates a **quantitative analyst's workflow**: it autonomously monitors the market, identifies key players using a knowledge graph, quantifies news impact with statistical rigor, and reports its findings on a real-time dashboard.
 
-## ⚙️ System Overview
+-----
 
-The system continuously performs this loop:
-**Ingest → Process (NLP) → Store → Backtest → Visualize**
+## ⚙️ System Architecture: A Decoupled, Multi-Service Design
 
-✅ Fetches and cleans real-time financial news (NSE/BSE, MoneyControl, ET, Mint)
-✅ Extracts company tickers with high accuracy (NER + NSE validation)
-✅ Evaluates sentiment using `FinBERT` (financially tuned BERT model)
-✅ Persists all results to SQLite for historical tracking
-✅ Backtests prediction validity against stock price data (`yfinance`)
-✅ Displays real-time and historical insights on an interactive Streamlit dashboard
+This project follows an industry-standard, decoupled architecture to ensure scalability and resilience. The slow data processing engine is completely separate from the fast, responsive user interface.
 
----
+  * **The Worker (`worker.py`):** A headless background service that runs continuously. It performs all heavy tasks: scraping news, calling NLP APIs, querying the knowledge graph, and writing results to the database.
+  * **The Dashboard (`dashboard.py`):** A lightweight Streamlit application whose only job is to read from the production database and display the pre-processed insights to the user.
+
+<!-- end list -->
+
+```mermaid
+graph TD
+    subgraph "Data Sources"
+        A1[News RSS Feeds]
+        A2[NSE Stock Data]
+    end
+
+    subgraph "Background Worker (Autonomous Engine)"
+        B1(Scheduler) --> B2{Process Feed}
+        B2 --> C1[Scraper]
+        C1 --> C2[NLP Pipeline]
+        C2 --> C3[Knowledge Graph Query]
+        C3 --> C4[Insight Generation]
+        C4 --> D1[(PostgreSQL DB)]
+    end
+    
+    subgraph "Knowledge & Data Layer"
+        D1 -- Stores --> D2[Insights Table]
+        D3(Neo4j Graph DB) <--> C3
+        A2 --> D3
+    end
+
+    subgraph "User-Facing Application"
+        F1[Streamlit Dashboard] <--> D2
+        F1 --> User[(User / Analyst)]
+    end
+```
+
+-----
 
 ## ✨ Key Features
 
-| Feature                                      | Description                                                        |
-| -------------------------------------------- | ------------------------------------------------------------------ |
-| 📰 **Multi-source News Ingestion**           | Curated RSS and web feeds from top Indian financial sources        |
-| 🏷️ **Ticker Extraction (NER + Validation)** | spaCy NER + cross-check with official NSE stock list               |
-| 🤖 **Financial Sentiment Analysis**          | FinBERT model (Hugging Face) for context-aware financial sentiment |
-| 💾 **Persistent Data Storage**               | SQLite-based local database for all insights                       |
-| 📊 **Quantitative Backtesting Engine**       | Validates model predictions vs. real stock performance             |
-| 🧠 **Streamlit Dashboard**                   | Interactive real-time visualization of sentiment trends            |
+| Feature | Description | Industry-Grade Practice |
+| :--- | :--- | :--- |
+| 📰 **Automated Data Pipeline** | A headless worker (`worker.py`) runs on a schedule, autonomously ingesting and processing news. | **Decoupled Architecture** |
+| 🧠 **Knowledge Graph** | A **Neo4j** cloud database models the relationships between companies and sectors, enabling intelligent competitor analysis. | **Relational Understanding** |
+| ☁️ **Scalable Database** | All insights are stored in a cloud-hosted **PostgreSQL** database (Supabase), built to handle concurrent reads/writes. | **Production-Ready DB** |
+| 🏷️ **High-Accuracy Ticker Extraction** | A multi-stage pipeline: **spaCy NER** → junk data filtering → **fuzzy matching** (`thefuzz`) → validation against a blocklist. | **Data Quality Assurance** |
+| 🤖 **High-Speed NLP** | Uses the **Groq API** (`Llama-3.1`) for high-speed, accurate sentiment analysis and event classification. | **Scalable Inference** |
+| 📈 **Quantitative Backtesting** | A rigorous backtesting engine measures **Alpha** (outperformance vs. Nifty 50), **p-value** (statistical significance), and **Sharpe Ratio** (risk-adjusted return). | **Quantitative Validation** |
+| ✅ **Automated Testing** | A `pytest` suite provides a **unit testing safety net**, verifying the correctness of the core NLP logic. | **Software Engineering Best Practices** |
 
----
+-----
 
-## 📈 Example Quantitative Results
+## 📈 Quantitative Results: The Alpha Backtesting Engine
 
-| Ticker     | Date       | Predicted Sentiment | Next Day Return | Correct? |
-| ---------- | ---------- | ------------------- | --------------- | -------- |
-| BAJFINANCE | 2025-10-06 | Positive            | +0.76%          | ✅        |
-| RELIANCE   | 2025-10-07 | Positive            | -0.21%          | ❌        |
-| INFY       | 2025-10-08 | Negative            | -1.15%          | ✅        |
+The agent's performance is not a guess; it's scientifically measured. The backtester proves the agent's ability to find signals that generate **Alpha** (market outperformance), net of transaction costs.
 
-> An **accuracy >50%** over a large sample indicates a **statistically meaningful predictive edge**.
+| Ticker | Date | Prediction | Net Alpha | Correct? |
+| :--- | :--- | :--- | :--- | :--- |
+| JIOFIN | 2025-10-06 | Positive | **+1.66%** | ✅ |
 
----
+#### Statistical Analysis
+
+  * **Overall Accuracy (Based on Alpha):** 100.00% (1/1)
+  * **P-value (Probability of random luck):** 0.5000
+  * **Annualized Sharpe Ratio:** N/A
+  * **Conclusion:** Result is **NOT statistically significant**. More data is needed to prove a real edge.
+
+> This rigorous approach demonstrates an understanding that accuracy without statistical validation is meaningless.
+
+-----
 
 ## 🧩 Tech Stack
 
-| Layer             | Technologies                                     |
-| ----------------- | ------------------------------------------------ |
-| **Frontend**      | Streamlit                                        |
-| **Backend**       | Python                                           |
-| **NLP & AI**      | spaCy (`en_core_web_lg`), FinBERT (Hugging Face) |
-| **Data Handling** | Pandas, BeautifulSoup, Feedparser                |
-| **Finance APIs**  | yFinance                                         |
-| **Database**      | SQLite                                           |
-| **Orchestration** | dotenv, requests                                 |
-| **Backtesting**   | pandas-ta / custom comparison scripts            |
+| Layer | Technologies |
+| :--- | :--- |
+| **Frontend** | Streamlit |
+| **Backend** | Python |
+| **Databases** | **PostgreSQL** (Supabase), **Neo4j AuraDB** (Knowledge Graph) |
+| **NLP & AI** | spaCy, **Groq API (Llama 3.1)**, `thefuzz` |
+| **Data Handling** | Pandas, BeautifulSoup, Feedparser |
+| **Finance APIs** | yfinance |
+| **Testing** | **pytest** |
+| **Dependencies** | Pinned versions in `requirements.txt` for **reproducible builds** |
 
+-----
 
-```mermaid
-flowchart LR
-  subgraph DataSources [Data Sources]
-    A1(News RSS & Scrapers)
-    A2(Social Media / Twitter)
-    A3(Market Data - yfinance / APIs)
-    A4(NSE Stock List CSV)
-  end
-
-  subgraph Ingest ["Ingest Layer"]
-    B1(Feed Parser & Scraper)
-    B2(Preprocessor: clean / dedupe / normalize)
-  end
-
-  subgraph NLP ["NLP & Validation"]
-    C1(spaCy NER)
-    C2(Ticker Validator -> NSE List)
-    C3(FinBERT Sentiment)
-  end
-
-  subgraph Storage ["Storage & DB"]
-    D1(SQLite / Postgres)
-    D2(Insights Table)
-    D3(Raw Articles Table)
-  end
-
-  subgraph Analytics ["Analytics & Backtesting"]
-    E1(Backtester Module)
-    E2(Performance Metrics DB)
-    E3(Strategy Simulator)
-  end
-
-  subgraph UI ["Visualization / Orchestration"]
-    F1(Streamlit Dashboard)
-    F2(Task Queue (Celery) - optional)
-    F3(Docker / CI-CD)
-  end
-
-  %% connections
-  A1 --> B1
-  A2 --> B1
-  A3 --> B1
-  A4 --> C2
-
-  B1 --> B2
-  B2 --> C1
-  C1 --> C2
-  C2 --> C3
-  C3 --> D1
-
-  D1 --> E1
-  E1 --> E2
-  E2 --> F1
-
-  F1 -->|user| User[(Recruiter / Analyst)]
-
-  F2 --> B1
-  F3 --> F1
-  F3 --> E1
-
-
-## 🧰 Installation Guide
+## 🧰 Installation & Setup Guide
 
 1️⃣ **Clone the repository**
+2️⃣ **Set up a Python virtual environment** and `pip install -r requirements.txt`
+3️⃣ **Download the spaCy model:** `python -m spacy download en_core_web_lg`
+4️⃣ **Create your `.env` file** with your `GROQ_API_KEY`, `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, and PostgreSQL credentials.
+5️⃣ **Populate the Knowledge Base:**
+\* Run `python enrich_data.py` to create the enriched stock list.
+\* Run `python ingest_graph.py` to populate your Neo4j database.
+6️⃣ **Run the System:**
+\* **Terminal 1 (Worker):** `python scheduler.py`
+\* **Terminal 2 (Dashboard):** `streamlit run dashboard.py`
 
-```bash
-git clone https://github.com/shubhanagrawal/stock-insight-agent.git
-cd stock-insight-agent
-```
+-----
 
-2️⃣ **Set up virtual environment**
+## 🚀 Future Enhancements (Roadmap to Production V2)
 
-```bash
-python -m venv venv
-source venv/bin/activate   # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-3️⃣ **Download the NLP model**
-
-```bash
-python -m spacy download en_core_web_lg
-```
-
-4️⃣ **Prepare environment**
-Create a `.env` file in the root folder:
-
-```
-HUGGINGFACE_API_TOKEN=your_huggingface_token
-```
-
-5️⃣ **Run the Streamlit dashboard**
-
-```bash
-streamlit run dashboard.py
-```
-
-6️⃣ **(Optional) Run the backtester**
-
-```bash
-python backtester.py
-```
-
----
-
-## 🚀 Future Enhancements
-
-* [ ] **Celery + Redis Integration:** Move analysis to async background tasks
-* [ ] **Dockerization:** Deploy in a portable, production-ready container
-* [ ] **PostgreSQL Migration:** Scale data storage beyond SQLite
-* [ ] **Auto Stock Watchlist Generator:** Dynamically track trending tickers
-* [ ] **LLM Integration:** Summarize market news in human-readable insights
-
----
-
-## 🧠 Why This Project Stands Out
-
-This project demonstrates:
-
-* **AI + Finance understanding** — bridging NLP with quantitative validation
-* **End-to-End Product Design** — from ingestion to visualization
-* **Quantitative rigor** — validated model accuracy, not just text processing
-* **Professional-grade modular code** — maintainable, extensible, and reproducible
-
----
-
-## 👤 Author
-
-**Shubhan Agrawal**
-🎓 B.Tech CSE, MIT World Peace University, Pune
-💼 Data Science | NLP | Quantitative Finance | AI Systems
-🔗 [GitHub](https://github.com/shubhanagrawal) • [LinkedIn](https://linkedin.com/in/shubhanagrawal)
-
-
-
-## ⭐ Star This Repo
-
-If this project inspired you or showcased useful ideas — please consider giving it a ⭐!
-
-<p align="center">
-  <img src="https://img.shields.io/github/stars/shubhanagrawal/stock-insight-agent?style=social" />
-</p>
-
-
-
-Where AI meets Market Intelligence — turning news into numbers.
-
-
+  * [ ] **Process Supervisor:** Replace the `scheduler.py` script with a `systemd` service for automated restarts and true resilience.
+  * [ ] **Task Queue:** Implement **Celery + Redis** to parallelize article processing, enabling massive scalability.
+  * [ ] **CI/CD Pipeline:** Use **GitHub Actions** to automate testing and deployment, ensuring code quality.
+  * [ ] **Custom NER Model:** Fine-tune a `spaCy` model on custom-labeled financial news to further improve ticker extraction accuracy.
