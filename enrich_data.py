@@ -1,55 +1,78 @@
-# enrich_data.py
 import pandas as pd
 import yfinance as yf
 import logging
 from time import sleep
 from tqdm import tqdm
+import requests
+import psycopg2
+import os
+from dotenv import load_dotenv
 
+# --- Configuration ---
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+load_dotenv()
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_NAME = os.getenv("DB_NAME")
+NSE_URL = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
 
-def enrich_stock_data():
+def run_knowledge_base_update():
     """
-    Reads the basic NSE stock list, enriches it with sector information from
-    yfinance, and saves it to a new CSV file.
+    Downloads the latest stock list, enriches it with sector data, and
+    upserts it into the production PostgreSQL database.
     """
+    logging.info("--- Starting Knowledge Base Update ---")
+
+    # 1. Download latest stock list
     try:
-        df = pd.read_csv("nse_stocks.csv")
-        logging.info(f"Loaded {len(df)} stocks from nse_stocks.csv")
-    except FileNotFoundError:
-        logging.error("nse_stocks.csv not found. Please download it first.")
-        return
+        response = requests.get(NSE_URL, headers={'User-Agent': 'Mozilla/5.0'})
+        response.raise_for_status()
+        with open("nse_stocks_temp.csv", "w", encoding='utf-8') as f:
+            f.write(response.text)
+        df = pd.read_csv("nse_stocks_temp.csv")
+        df.columns = df.columns.str.strip()
+    except Exception as e:
+        logging.error(f"Failed to download from NSE: {e}"); return
 
+    # 2. Enrich with Sector Data
     sectors = []
-    # Use tqdm for a nice progress bar, as this will take a while
-    for ticker_symbol in tqdm(df['SYMBOL'], desc="Enriching data with sectors"):
+    for ticker_symbol in tqdm(df['SYMBOL'], desc="Enriching data"):
         try:
-            # Append ".NS" for Indian stocks
             ticker = yf.Ticker(f"{ticker_symbol}.NS")
-            
-            # .info is a dictionary containing company data
             sector = ticker.info.get('sector')
-            
-            if sector:
-                sectors.append(sector)
-            else:
-                sectors.append(None) # Append None if sector is not found
-            
-            # Be respectful to the API and avoid getting rate-limited
-            sleep(0.1) 
-        except Exception as e:
-            logging.warning(f"Could not fetch info for {ticker_symbol}: {e}")
+            sectors.append(sector)
+            sleep(0.1)
+        except Exception:
             sectors.append(None)
-
     df['sector'] = sectors
     
-    # Drop rows where we couldn't find a sector
-    df_enriched = df.dropna(subset=['sector'])
-    
-    # Save the new, complete dataset
-    output_path = "nse_stocks_enriched.csv"
-    df_enriched.to_csv(output_path, index=False)
-    
-    logging.info(f"Enrichment complete. Saved {len(df_enriched)} stocks with sector data to {output_path}")
+    # 3. Clean and Prepare Data for Upsert
+    df_enriched = df.dropna(subset=['sector', 'NAME OF COMPANY', 'SYMBOL'])
+    records = df_enriched[['SYMBOL', 'NAME OF COMPANY', 'sector']].to_records(index=False)
+
+    # 4. Upsert into PostgreSQL Database
+    conn = None
+    try:
+        conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, user=DB_USER, password=DB_PASSWORD, dbname=DB_NAME)
+        with conn.cursor() as cursor:
+            # This query will INSERT new stocks or UPDATE existing ones if they change
+            upsert_query = """
+            INSERT INTO stocks (ticker, name, sector, last_updated)
+            VALUES (%s, %s, %s, NOW())
+            ON CONFLICT (ticker) DO UPDATE SET
+                name = EXCLUDED.name,
+                sector = EXCLUDED.sector,
+                last_updated = NOW();
+            """
+            cursor.executemany(upsert_query, records)
+            conn.commit()
+        logging.info(f"Successfully upserted {len(records)} stocks into the database.")
+    except Exception as e:
+        logging.error(f"Database upsert failed: {e}")
+    finally:
+        if conn: conn.close()
 
 if __name__ == "__main__":
-    enrich_stock_data()
+    run_knowledge_base_update()

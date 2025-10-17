@@ -1,19 +1,24 @@
-# ticker_utils.py
+# In ticker_utils.py
 import pandas as pd
 import logging
+import psycopg2
+import os
+from dotenv import load_dotenv
 
-def load_nse_tickers(filepath="nse_stocks.csv"):
-    """
-    Loads the NSE stock data from the CSV and creates a mapping
-    from company name to ticker symbol.
-    """
+load_dotenv()
+DB_HOST = os.getenv("DB_HOST")
+# ... (load all DB credentials)
+
+def load_nse_tickers():
+    """Loads the ticker map from the PostgreSQL database."""
+    conn = None
     try:
-        df = pd.read_csv(filepath)
-        # Create a dictionary mapping: {'COMPANY NAME': 'SYMBOL'}
-        # We convert the name to lowercase for case-insensitive matching
-        ticker_map = {str(name).lower(): symbol for name, symbol in zip(df['NAME OF COMPANY'], df['SYMBOL'])}
-        logging.info(f"Successfully loaded {len(ticker_map)} NSE tickers.")
+        conn = psycopg2.connect(...) # Use your DB credentials
+        df = pd.read_sql_query("SELECT name, ticker FROM stocks", conn)
+        ticker_map = {str(name).lower(): symbol for name, symbol in zip(df['name'], df['ticker'])}
+        logging.info(f"Loaded {len(ticker_map)} tickers from PostgreSQL.")
         return ticker_map
-    except FileNotFoundError:
-        logging.error(f"Ticker file not found at {filepath}. Please download it from the NSE website.")
-        return {}
+    except Exception as e:
+        logging.error(f"Failed to load tickers from DB: {e}"); return {}
+    finally:
+        if conn: conn.close()
