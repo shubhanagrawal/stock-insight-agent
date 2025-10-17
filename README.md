@@ -13,7 +13,7 @@
 *(💡 Tip: Upload a short demo GIF in `/assets/demo.gif` and embed it below for maximum visual impact)*
 
 ```markdown
-![AI Stock Insight Demo](assets/demo.gif)
+![AI Stock Insight Demo](https://raw.githubusercontent.com/shubhanagrawal/stock-insight-agent/main/assets/demo.gif)
 ```
 
 -----
