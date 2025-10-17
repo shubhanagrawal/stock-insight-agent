@@ -1,15 +1,41 @@
-# In your new requirements.txt file
-streamlit
-pandas
-plotly
-# Use a specific, stable version of protobuf
-protobuf==3.20.0
-# Lock numpy to a version before the breaking 2.0 release
-numpy<2.0
-yfinance
-feedparser
-requests
-beautifulsoup4
-python-dotenv
-spacy
-gunicorn
+# ====================================================================
+# AI Stock Insight Agent - Python Dependencies
+#
+# To install all dependencies for this project, run:
+# pip install -r requirements.txt
+#
+# This file was generated to ensure reproducible builds.
+# It pins the exact version of every library.
+# ====================================================================
+
+# --- Core Web Framework & UI ---
+streamlit==1.33.0
+gunicorn==22.0.0
+
+# --- Data Handling & Numerical Computation ---
+pandas==2.2.2
+numpy==1.26.4  # Pinned to <2.0 to maintain compatibility with older libraries
+scipy==1.12.0   # Pinned to a version compatible with numpy 1.x
+
+# --- Data Acquisition & Scraping ---
+feedparser==6.0.11
+requests==2.31.0
+beautifulsoup4==4.12.3
+yfinance==0.2.37
+cloudscraper==1.2.71
+httpx==0.27.0     # For async scraping
+
+# --- NLP & Machine Learning ---
+spacy==3.7.4
+thefuzz==0.22.1
+python-Levenshtein==0.25.1 # Speeds up thefuzz
+groq==0.9.0
+
+# --- Database Connectors ---
+psycopg2-binary==2.9.9  # For PostgreSQL
+neo4j==5.18.0           # For Neo4j
+
+# --- Utilities ---
+python-dotenv==1.0.1
+protobuf==3.20.3 # Pinned to a stable 3.x version to avoid conflicts
+tqdm==4.66.4      # For progress bars in scripts

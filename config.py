@@ -1,8 +1,5 @@
 # config.py
 
-# --- DATABASE CONFIG ---
-DB_FILE = "insights.db"
-
 # --- SCHEDULER CONFIG ---
 RUN_INTERVAL_SECONDS = 900  # 15 minutes
 FEEDS_TO_PROCESS = {
@@ -30,3 +27,4 @@ COMPETITIVE_KEYWORDS = {'beats', 'wins', 'outperforms', 'loses to', 'rival'}
 # --- BACKTESTER CONFIG ---
 TRANSACTION_COST_PERCENT = 0.2
 BENCHMARK_TICKER = "^NSEI" # Nifty 50 Index
+RISK_FREE_RATE = 0.07 # Assume a 7% annual risk-free rate for India
