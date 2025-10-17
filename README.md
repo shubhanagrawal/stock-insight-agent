@@ -8,7 +8,7 @@
 
 -----
 
-## 🌐 [🎥 Live Demo (Streamlit App)](https://your-demo-link-here.com)
+## 🌐 [🎥 Live Demo (Streamlit App)](https://shubhanagrawal-stock-insight-agent-dashboard-jgdan0.streamlit.app/)
 
 *(💡 Tip: Upload a short demo GIF in `/assets/demo.gif` and embed it below for maximum visual impact)*
 
