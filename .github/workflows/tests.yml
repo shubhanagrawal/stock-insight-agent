@@ -1,0 +1,51 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install \
+            streamlit pandas numpy scipy \
+            spacy thefuzz python-Levenshtein \
+            yfinance feedparser requests beautifulsoup4 \
+            cloudscraper httpx \
+            groq python-dotenv psycopg2-binary neo4j \
+            textblob protobuf tqdm \
+            google-generativeai \
+            pytest
+
+      - name: Download spaCy model
+        run: python -m spacy download en_core_web_lg
+
+      - name: Run tests
+        env:
+          # Provide dummy values so modules that read .env don't crash at import
+          GROQ_API_KEY: "dummy"
+          GOOGLE_API_KEY: "dummy"
+          NEO4J_URI: "neo4j+s://dummy.databases.neo4j.io"
+          NEO4J_USERNAME: "neo4j"
+          NEO4J_PASSWORD: "dummy"
+          DB_HOST: "localhost"
+          DB_PORT: "5432"
+          DB_USER: "postgres"
+          DB_PASSWORD: "dummy"
+          DB_NAME: "postgres"
+        run: pytest tests/ -v --tb=short

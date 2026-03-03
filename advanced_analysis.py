@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import re
+import os
+import json
 from textblob import TextBlob
 import logging
 
@@ -96,13 +98,23 @@ class AdvancedSentimentAnalyzer:
         return multiplier
 
 class TradingSignalGenerator:
+    # Path where backtester.py writes calibrated weights after each run
+    _WEIGHTS_FILE = os.path.join(os.path.dirname(__file__), "signal_weights.json")
+
     def __init__(self):
-        self.signal_weights = {
+        # Default weights — overridden by calibrated values if available
+        _defaults = {
             'sentiment': 0.4,
             'price_momentum': 0.3,
             'volume': 0.2,
-            'technical': 0.1
+            'technical': 0.1,
         }
+        try:
+            with open(self._WEIGHTS_FILE) as f:
+                self.signal_weights = json.load(f)
+            logging.info("TradingSignalGenerator: loaded calibrated signal weights.")
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.signal_weights = _defaults
     
     def generate_trading_signal(self, sentiment_data, stock_data, technical_data=None):
         """Generate comprehensive trading signal"""
@@ -112,21 +124,15 @@ class TradingSignalGenerator:
         sentiment_signal = self._sentiment_to_signal(sentiment_data)
         signals['sentiment'] = sentiment_signal
         
-        # Price momentum signal
-        if stock_data:
-            momentum_signal = self._price_momentum_signal(stock_data)
-            # FIX 2: Changed key from 'momentum' to 'price_momentum' to match the
-            # self.signal_weights dictionary. This ensures the correct weight (0.3) is applied.
+        # Price momentum signal — uses 10-day ROC when history available
+        if stock_data is not None:
+            momentum_signal = self._price_momentum_signal(stock_data, technical_data)
             signals['price_momentum'] = momentum_signal
-            
-            # Volume signal
-            volume_signal = self._volume_signal(stock_data)
-            
-            # FIX 3: Made volume directional. Raw volume is just magnitude, but for a trading
-            # signal, it should be negative on down days and positive on up days.
+
+            # Volume signal — uses relative volume when history available
+            volume_signal = self._volume_signal(stock_data, technical_data)
             if momentum_signal != 0:
                 volume_signal *= np.sign(momentum_signal)
-
             signals['volume'] = volume_signal
         
         # Technical signal (if available)
@@ -157,59 +163,82 @@ class TradingSignalGenerator:
         else:
             return 0
     
-    def _price_momentum_signal(self, stock_data):
-        """Generate signal based on price momentum"""
-        change_pct = stock_data.get('change_percent', 0)
-        
-        # Normalize percentage change to signal (-1 to 1)
-        signal = np.tanh(change_pct / 5)  # 5% change = ~0.76 signal
-        return signal
+    def _price_momentum_signal(self, stock_data, technical_data=None) -> float:
+        """Generate signal based on price momentum.
+        Uses 10-day Rate-of-Change (ROC) when historical data is available,
+        falling back to the single-day change_percent from the price dict.
+        """
+        if technical_data is not None and not technical_data.empty and len(technical_data) >= 10:
+            close = technical_data['Close']
+            roc_10 = ((close.iloc[-1] - close.iloc[-10]) / close.iloc[-10]) * 100
+            return float(np.tanh(roc_10 / 10))  # 10% 10d move ≈ 0.76 signal
+        # Fallback: single-day change from price dict
+        change_pct = stock_data.get('change_percent', 0) if isinstance(stock_data, dict) else 0
+        return float(np.tanh(change_pct / 5))
     
-    def _volume_signal(self, stock_data):
-        """Generate signal based on volume (simplified)"""
-        # This is a simplified version - in reality, you'd compare with historical volume
-        volume = stock_data.get('volume', 0)
-        
-        # Assume higher volume is more significant
-        if volume > 1000000:  # High volume
+    def _volume_signal(self, stock_data, technical_data=None) -> float:
+        """Generate signal based on volume relative to its 20-day average.
+        Relative volume > 1 means above-average participation (stronger signal).
+        Falls back to absolute bucket thresholds when history is unavailable.
+        """
+        if technical_data is not None and not technical_data.empty and len(technical_data) >= 20:
+            vol = technical_data['Volume']
+            avg_vol = vol.rolling(20).mean().iloc[-1]
+            current_vol = vol.iloc[-1]
+            if avg_vol > 0:
+                relative_vol = current_vol / avg_vol
+                return float(np.tanh(relative_vol - 1.0))  # 0 = average; >0 = above average
+        # Fallback: absolute thresholds
+        volume = stock_data.get('volume', 0) if isinstance(stock_data, dict) else 0
+        if volume > 1_000_000:
             return 0.5
-        elif volume > 100000:  # Medium volume
+        elif volume > 100_000:
             return 0.2
-        else:  # Low volume
-            return 0
+        return 0.0
     
-    def _technical_signal(self, technical_data):
-        """Generate signal from technical indicators"""
+    def _technical_signal(self, technical_data) -> float:
+        """Generate signal from RSI, moving averages, and Bollinger Band position."""
         if technical_data is None or technical_data.empty:
             return 0
-        
+
         latest = technical_data.iloc[-1]
         signals = []
-        
-        # RSI signal
+
+        # --- RSI ---
         rsi = latest.get('RSI')
         if pd.notna(rsi):
             if rsi > 70:
-                signals.append(-0.5)  # Overbought
+                signals.append(-0.5)   # Overbought
             elif rsi < 30:
-                signals.append(0.5)   # Oversold
+                signals.append(0.5)    # Oversold
             else:
-                signals.append(0)
-        
-        # Moving average signal
+                # Smooth signal: positive in 30-50 (rising from oversold), negative in 50-70
+                signals.append(float(np.tanh((50 - rsi) / 20)))
+
+        # --- Moving average trend ---
         close = latest.get('Close')
         ma_20 = latest.get('MA_20')
         ma_50 = latest.get('MA_50')
-        
         if pd.notna(close) and pd.notna(ma_20) and pd.notna(ma_50):
             if close > ma_20 > ma_50:
-                signals.append(0.3)   # Bullish
+                signals.append(0.3)    # Bullish alignment
             elif close < ma_20 < ma_50:
-                signals.append(-0.3)  # Bearish
+                signals.append(-0.3)   # Bearish alignment
             else:
                 signals.append(0)
-        
-        return np.mean(signals) if signals else 0
+
+        # --- Bollinger Band position ---
+        bb_upper = latest.get('BB_Upper')
+        bb_lower = latest.get('BB_Lower')
+        if pd.notna(close) and pd.notna(bb_upper) and pd.notna(bb_lower):
+            bb_range = bb_upper - bb_lower
+            if bb_range > 0:
+                # 0 = at lower band (oversold), 1 = at upper band (overbought)
+                bb_position = (close - bb_lower) / bb_range
+                # Centre and scale: 0.5 = neutral, <0.5 = bullish, >0.5 = bearish
+                signals.append(float(np.tanh((bb_position - 0.5) * 4)))
+
+        return float(np.mean(signals)) if signals else 0
     
     def _calculate_overall_signal(self, signals):
         """Calculate weighted overall signal"""

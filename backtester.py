@@ -3,6 +3,8 @@ import yfinance as yf
 from datetime import datetime, timedelta
 import logging
 import numpy as np
+import os
+import json
 from scipy.stats import binomtest
 
 # --- Correctly import the PostgreSQL connection functions ---
@@ -117,6 +119,24 @@ def run_backtest():
         else:
             print("\nConclusion: Result is NOT statistically significant. More data is needed.")
         print("-" * 60)
+
+        # ── Calibrate signal weights from measured accuracy ────────────────────────
+        # Only save when we have enough samples for a reliable estimate.
+        if total_predictions >= 10:
+            sentiment_weight = round(max(min(accuracy / 100, 0.70), 0.25), 3)
+            remaining = round(1.0 - sentiment_weight, 3)
+            calibrated = {
+                "sentiment":      sentiment_weight,
+                "price_momentum": round(remaining * 0.50, 3),
+                "volume":         round(remaining * 0.30, 3),
+                "technical":      round(remaining * 0.20, 3),
+                "_accuracy_pct":  round(accuracy, 2),
+                "_sample_size":   total_predictions,
+            }
+            weights_path = os.path.join(os.path.dirname(__file__), "signal_weights.json")
+            with open(weights_path, "w") as f:
+                json.dump(calibrated, f, indent=2)
+            logging.info(f"Signal weights calibrated and saved → {calibrated}")
     else:
         print("No actionable insights old enough were found to evaluate.")
 
