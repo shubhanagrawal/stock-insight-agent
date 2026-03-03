@@ -6,7 +6,7 @@ import numpy as np
 from scipy.stats import binomtest
 
 # --- Correctly import the PostgreSQL connection functions ---
-from database import get_db_connection, release_db_connection
+from database import get_db_connection, release_db_connection, connection_pool
 from config import TRANSACTION_COST_PERCENT, BENCHMARK_TICKER, RISK_FREE_RATE
 
 # --- Configuration ---
@@ -18,9 +18,12 @@ def run_backtest():
     Performs a rigorous backtest by reading from the production PostgreSQL database,
     measuring Alpha, p-value, and Sharpe Ratio.
     """
-    conn = None # Initialize conn to None
+    if not connection_pool:
+        logging.error("Backtest aborted: no database connection available.")
+        return
+
+    conn = None
     try:
-        # --- FIX: Use the PostgreSQL connection pool ---
         conn = get_db_connection()
         query = "SELECT * FROM insights WHERE sentiment != 'Neutral' AND timestamp < NOW() - INTERVAL '3 days'"
         df = pd.read_sql_query(query, conn)

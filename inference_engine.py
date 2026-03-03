@@ -1,12 +1,14 @@
 # inference_engine.py
-import streamlit as st
+from functools import lru_cache
 from core_nlp import analyze_sentiment_core, classify_event_type_core
 
-@st.cache_data(ttl="1h")
+# lru_cache is used instead of @st.cache_data so this module works both in
+# Streamlit and in standalone scripts (app.py, worker.py) without errors.
+@lru_cache(maxsize=512)
 def analyze_sentiment(text: str) -> dict:
     return analyze_sentiment_core(text)
 
-@st.cache_data(ttl="1h")
+@lru_cache(maxsize=512)
 def classify_event_type(text: str) -> str:
     return classify_event_type_core(text)
 

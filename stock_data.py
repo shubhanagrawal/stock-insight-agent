@@ -9,10 +9,34 @@ import logging
 NSE_SUFFIX = ".NS"
 BSE_SUFFIX = ".BO"
 
+# ── Sentiment strategy note ──────────────────────────────────────────────────
+# This project uses TWO sentiment paths intentionally:
+#   • Groq LLM (core_nlp.py)         → used by worker.py / app.py pipeline
+#     High accuracy, slower, costs API calls. Used for batch news processing.
+#   • TextBlob + keywords (advanced_analysis.py) → used by dashboard.py
+#     Fast, free, no API call. Used for real-time interactive dashboard UI.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _TTLCache:
+    """Lightweight in-process TTL cache to avoid repeated yfinance API calls."""
+    def __init__(self, ttl_seconds: int = 300):
+        self._store: dict = {}
+        self._ttl = ttl_seconds
+
+    def get(self, key):
+        entry = self._store.get(key)
+        if entry and (datetime.now() - entry['ts']).seconds < self._ttl:
+            return entry['data']
+        return None
+
+    def set(self, key, data):
+        self._store[key] = {'data': data, 'ts': datetime.now()}
+
+_cache = _TTLCache(ttl_seconds=300)
+
 class StockDataFetcher:
     def __init__(self):
-        self.cache = {}
-        self.cache_duration = 300  # 5 minutes cache
+        self._cache = _cache  # shared module-level TTL cache
     
     def get_stock_price(self, ticker, exchange="NSE"):
         """Get current stock price and basic metrics"""
@@ -23,10 +47,10 @@ class StockDataFetcher:
             else:
                 full_ticker = f"{ticker}{BSE_SUFFIX}"
             
-            # Check cache
             cache_key = f"{full_ticker}_price"
-            if self._is_cached(cache_key):
-                return self.cache[cache_key]['data']
+            cached = self._cache.get(cache_key)
+            if cached is not None:
+                return cached
             
             # Fetch data
             stock = yf.Ticker(full_ticker)
@@ -56,8 +80,7 @@ class StockDataFetcher:
                 'fifty_two_week_low': info.get('fiftyTwoWeekLow', 'N/A'),
             }
             
-            # Cache the data
-            self._cache_data(cache_key, data)
+            self._cache.set(cache_key, data)
             return data
             
         except Exception as e:
@@ -70,8 +93,9 @@ class StockDataFetcher:
             full_ticker = f"{ticker}{NSE_SUFFIX if exchange == 'NSE' else BSE_SUFFIX}"
             
             cache_key = f"{full_ticker}_hist_{period}"
-            if self._is_cached(cache_key):
-                return self.cache[cache_key]['data']
+            cached = self._cache.get(cache_key)
+            if cached is not None:
+                return cached
             
             stock = yf.Ticker(full_ticker)
             hist = stock.history(period=period)
@@ -83,7 +107,7 @@ class StockDataFetcher:
             hist.reset_index(inplace=True)
             hist['Date'] = hist['Date'].dt.strftime('%Y-%m-%d')
             
-            self._cache_data(cache_key, hist)
+            self._cache.set(cache_key, hist)
             return hist
             
         except Exception as e:
@@ -129,20 +153,7 @@ class StockDataFetcher:
                 results[company] = data
         return results
     
-    def _is_cached(self, key):
-        """Check if data is cached and still valid"""
-        if key not in self.cache:
-            return False
-        
-        cache_time = self.cache[key]['timestamp']
-        return (datetime.now() - cache_time).seconds < self.cache_duration
-    
-    def _cache_data(self, key, data):
-        """Cache data with timestamp"""
-        self.cache[key] = {
-            'data': data,
-            'timestamp': datetime.now()
-        }
+    # _is_cached and _cache_data removed — now handled by the shared _TTLCache above.
 
 # Alternative free API option (Alpha Vantage)
 class AlphaVantageStockData:

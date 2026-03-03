@@ -1,104 +1,150 @@
-import spacy
-import logging
+# tests/test_nlp_processor.py
+"""Unit tests for nlp_processor.py — ticker extraction and key figure extraction."""
+
+import sys
+import os
 import re
-from ticker_utils import load_nse_tickers
-from thefuzz import fuzz
-from config import FUZZY_MATCH_THRESHOLD, ENTITY_BLOCKLIST
+import pytest
+from unittest.mock import patch, MagicMock
 
-# --- INITIALIZATION ---
-try:
-    nlp = spacy.load("en_core_web_lg")
-except OSError:
-    logging.error("spaCy model 'en_core_web_lg' not found. Run 'python -m spacy download en_core_web_lg'")
-    nlp = None
-
-NSE_TICKER_MAP = load_nse_tickers()
-
-def extract_tickers(text: str) -> dict:
-    """Extracts validated tickers using NER + fallback fuzzy/regex logic."""
-    if not NSE_TICKER_MAP:
-        return {}
-
-    found_tickers = {}
-    potential_companies_raw = set()
-
-    # --- Stage 1: NER extraction (if spaCy model is available) ---
-    if nlp:
-        doc = nlp(text)
-        potential_companies_raw |= {ent.text.strip() for ent in doc.ents if ent.label_ == "ORG"}
-
-    # --- Stage 2: Simple pattern-based extraction (fallback for missed NER) ---
-    # capture capitalized words that might be company names
-    pattern = re.compile(r'\b([A-Z][a-zA-Z.&\s]{2,})\b')
-    potential_companies_raw |= set(pattern.findall(text))
-
-    # --- Filter unwanted patterns ---
-    sensible_pattern = re.compile(r'^[a-zA-Z0-9\s.&-]+$')
-    potential_companies = {
-        name.strip()
-        for name in potential_companies_raw
-        if sensible_pattern.match(name) and len(name) > 2
-    }
-
-    # --- Stage 3: Match each potential name against NSE tickers ---
-    for ner_name in potential_companies:
-        if ner_name.lower() in ENTITY_BLOCKLIST:
-            continue
-
-        best_match_name, best_match_ticker, highest_score = (None, None, 0)
-
-        for official_name, ticker in NSE_TICKER_MAP.items():
-            score = fuzz.token_set_ratio(ner_name.lower(), official_name.lower())
-            if score > highest_score:
-                highest_score, best_match_name, best_match_ticker = score, official_name, ticker
-            elif score == highest_score and best_match_name and len(official_name) < len(best_match_name):
-                best_match_name, best_match_ticker = official_name, ticker
-
-        if highest_score > FUZZY_MATCH_THRESHOLD:
-            found_tickers[best_match_name] = {
-                "ticker": best_match_ticker,
-                "ner_name": ner_name
-            }
-            logging.info(f"Validated ticker: '{ner_name}' -> {best_match_ticker} (Match: '{best_match_name}')")
-
-    return found_tickers
+# Make sure the project root is on the path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
-def extract_key_figures(text: str) -> dict:
-    """Uses spaCy to extract and prioritize key numerical figures."""
-    if not nlp:
-        return {}
+# ---------------------------------------------------------------------------
+# Helpers — pure functions from nlp_processor
+# ---------------------------------------------------------------------------
 
-    doc = nlp(text)
-    figures = {}
+from nlp_processor import _normalize_text, _build_normalized_index
 
-    LIMIT_OTHER_FIGURES = 3
-    other_percents, other_monies = [], []
 
-    for ent in doc.ents:
-        context_window = doc[max(0, ent.start - 7):min(len(doc), ent.end + 7)].text.lower()
+class TestNormalizeText:
+    def test_lowercases_input(self):
+        assert _normalize_text("Reliance Industries") == "reliance industries"
 
-        if ent.label_ == "PERCENT":
-            if "profit" in context_window:
-                figures["profit_change_percent"] = ent.text
-            elif "revenue" in context_window or "topline" in context_window:
-                figures["revenue_change_percent"] = ent.text
-            elif len(other_percents) < LIMIT_OTHER_FIGURES:
-                other_percents.append(ent.text)
+    def test_replaces_punctuation_with_space(self):
+        assert _normalize_text("L&T Finance") == "l t finance"
 
-        elif ent.label_ == "MONEY":
-            if "profit" in context_window or "pat" in context_window:
-                figures["profit_amount"] = ent.text
-            elif "revenue" in context_window:
-                figures["revenue_amount"] = ent.text
-            elif "deal" in context_window or "wins" in context_window:
-                figures["deal_size"] = ent.text
-            elif len(other_monies) < LIMIT_OTHER_FIGURES:
-                other_monies.append(ent.text)
+    def test_strips_leading_trailing_whitespace(self):
+        assert _normalize_text("  HDFC  ") == "hdfc"
 
-    if other_percents:
-        figures["other_noteworthy_percents"] = other_percents
-    if other_monies:
-        figures["other_noteworthy_figures"] = other_monies
+    def test_empty_string(self):
+        assert _normalize_text("") == ""
 
-    return figures
+
+class TestBuildNormalizedIndex:
+    def test_official_name_is_indexed(self, sample_nse_map):
+        index = _build_normalized_index(sample_nse_map)
+        assert "reliance industries limited" in index
+
+    def test_short_form_without_suffix_is_indexed(self, sample_nse_map):
+        """'limited'/'ltd' suffixes should be stripped and also indexed."""
+        index = _build_normalized_index(sample_nse_map)
+        assert "reliance industries" in index
+
+    def test_correct_ticker_returned(self, sample_nse_map):
+        index = _build_normalized_index(sample_nse_map)
+        official_name, ticker = index["reliance industries limited"]
+        assert ticker == "RELIANCE"
+
+    def test_empty_map_returns_empty_index(self):
+        assert _build_normalized_index({}) == {}
+
+
+# ---------------------------------------------------------------------------
+# extract_tickers — uses mocked NSE map and spaCy
+# ---------------------------------------------------------------------------
+
+class TestExtractTickers:
+    def _run_extraction(self, text, nse_map, ner_entities=None):
+        """Helper: patches NSE_TICKER_MAP and spaCy inside nlp_processor."""
+        import nlp_processor
+
+        # Build a mock spaCy doc whose .ents returns given ORG entities
+        mock_ent = MagicMock()
+        mock_ent.label_ = "ORG"
+        mock_ent.text = ner_entities[0] if ner_entities else ""
+        mock_doc = MagicMock()
+        mock_doc.ents = [mock_ent] if ner_entities else []
+
+        mock_nlp = MagicMock(return_value=mock_doc)
+
+        with (
+            patch.object(nlp_processor, "NSE_TICKER_MAP", nse_map),
+            patch.object(nlp_processor, "NORMALIZED_INDEX",
+                         _build_normalized_index(nse_map)),
+            patch.object(nlp_processor, "nlp", mock_nlp),
+        ):
+            return nlp_processor.extract_tickers(text)
+
+    def test_exact_company_name_match(self, sample_nse_map):
+        result = self._run_extraction(
+            "Reliance Industries saw huge gains today.",
+            sample_nse_map,
+            ner_entities=["Reliance Industries"],
+        )
+        assert any(data["ticker"] == "RELIANCE" for data in result.values())
+
+    def test_empty_text_returns_empty_dict(self, sample_nse_map):
+        result = self._run_extraction("", sample_nse_map)
+        assert result == {}
+
+    def test_empty_nse_map_returns_empty_dict(self):
+        from nlp_processor import extract_tickers
+        with patch("nlp_processor.NSE_TICKER_MAP", {}):
+            assert extract_tickers("Reliance posted profits.") == {}
+
+    def test_blocklisted_entity_is_excluded(self, sample_nse_map):
+        """SEBI is in the blocklist and should never appear as a ticker."""
+        result = self._run_extraction(
+            "SEBI announced new regulations today.",
+            sample_nse_map,
+            ner_entities=["SEBI"],
+        )
+        tickers = [d["ticker"] for d in result.values()]
+        assert "SEBI" not in tickers
+
+    def test_result_contains_required_keys(self, sample_nse_map):
+        result = self._run_extraction(
+            "Infosys beat earnings estimates.",
+            sample_nse_map,
+            ner_entities=["Infosys"],
+        )
+        for data in result.values():
+            assert "ticker" in data
+            assert "ner_name" in data
+
+
+# ---------------------------------------------------------------------------
+# extract_key_figures — mocked spaCy entities
+# ---------------------------------------------------------------------------
+
+class TestExtractKeyFigures:
+    def _make_mock_doc(self, entities):
+        """Build a minimal mock spaCy doc from a list of (label, text, context) tuples."""
+        mock_ents = []
+        for label, text, ctx_text in entities:
+            ent = MagicMock()
+            ent.label_ = label
+            ent.text = text
+            ent.start = 5
+            ent.end = 6
+            mock_ents.append(ent)
+
+        mock_doc = MagicMock()
+        mock_doc.ents = mock_ents
+        # context window returns lowercase context text
+        mock_doc.__getitem__ = lambda self, key: MagicMock(
+            text=entities[0][2] if entities else ""
+        )
+        return mock_doc
+
+    def test_returns_empty_when_nlp_unavailable(self):
+        import nlp_processor
+        with patch.object(nlp_processor, "nlp", None):
+            assert nlp_processor.extract_key_figures("some text") == {}
+
+    def test_returns_empty_for_empty_text(self):
+        import nlp_processor
+        with patch.object(nlp_processor, "nlp", MagicMock()):
+            assert nlp_processor.extract_key_figures("") == {}
