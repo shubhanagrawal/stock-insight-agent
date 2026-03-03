@@ -45,9 +45,12 @@ class TestTTLCache:
 # ---------------------------------------------------------------------------
 
 def _make_fake_hist(prices=None):
-    """Return a minimal DataFrame mimicking yfinance history output."""
+    """Return a minimal DataFrame mimicking yfinance history output.
+    The index MUST be named 'Date' — yfinance always names it this way and
+    StockDataFetcher.get_historical_data() relies on it after reset_index().
+    """
     prices = prices or [2800.0, 2850.0]
-    dates = pd.date_range(end=pd.Timestamp.today(), periods=len(prices), freq="B")
+    dates = pd.date_range(end=pd.Timestamp.today(), periods=len(prices), freq="B", name="Date")
     return pd.DataFrame({
         "Close": prices,
         "High": [p + 20 for p in prices],
