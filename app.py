@@ -3,6 +3,7 @@ import logging
 from scraper import scrape_news
 from nlp_processor import extract_tickers
 from inference_engine import analyze_sentiment, generate_insight
+from config import FEEDS_TO_PROCESS
 
 # Set up logging to see the output from all modules
 logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(name)s: %(message)s')
@@ -13,11 +14,15 @@ def main():
     This version processes multiple articles from the feed.
     """
     logging.info("🚀 Starting the AI Insight Agent...")
-    
+
     # --- STAGE 1: SCRAPING ---
-    # The new scraper can fetch multiple articles. Let's process the latest 3.
-    articles = scrape_news(limit=3)
-    
+    # Collect articles from all configured feeds.
+    articles = []
+    for source_name, feed_config in FEEDS_TO_PROCESS.items():
+        logging.info(f"Fetching from {source_name}...")
+        fetched = scrape_news(url=feed_config['url'], limit=3)
+        articles.extend(fetched)
+
     if not articles:
         logging.warning("Could not fetch any articles. Exiting.")
         return

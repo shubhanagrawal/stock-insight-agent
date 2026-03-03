@@ -2,7 +2,7 @@ import spacy
 import logging
 import re
 from ticker_utils import load_nse_tickers
-from thefuzz import fuzz
+# from thefuzz import fuzz
 from config import FUZZY_MATCH_THRESHOLD, ENTITY_BLOCKLIST
 
 # --- INITIALIZATION ---

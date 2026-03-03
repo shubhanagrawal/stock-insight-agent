@@ -41,6 +41,9 @@ def release_db_connection(conn):
 
 def initialize_db():
     """Creates the 'insights' table in PostgreSQL if it doesn't exist."""
+    if not connection_pool:
+        logging.warning("initialize_db: skipped — no DB connection available.")
+        return
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
@@ -60,6 +63,9 @@ def initialize_db():
 
 def save_specific_insight(article_title, link, company_name, ticker, sentiment_result, event_type, impact_score, key_figures_json):
     """Saves a single, enriched insight into the PostgreSQL database."""
+    if not connection_pool:
+        logging.warning("save_specific_insight: skipped — no DB connection available.")
+        return
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
@@ -76,6 +82,9 @@ def save_specific_insight(article_title, link, company_name, ticker, sentiment_r
 
 def get_historical_sentiment(ticker: str):
     """Fetches historical sentiment data for a specific ticker from PostgreSQL."""
+    if not connection_pool:
+        logging.warning("get_historical_sentiment: skipped — no DB connection available.")
+        return pd.DataFrame()
     conn = get_db_connection()
     try:
         query = "SELECT * FROM insights WHERE ticker = %s ORDER BY timestamp DESC"
