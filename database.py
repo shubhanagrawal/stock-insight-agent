@@ -1,4 +1,12 @@
 # database.py
+#
+# NOTE ON insights.db
+# -------------------
+# An `insights.db` SQLite file exists in the project root — this is a legacy
+# artifact from an earlier development phase. It is unused. The production
+# database is PostgreSQL (Supabase), configured via environment variables in .env.
+# insights.db is listed in .gitignore and should not be committed.
+#
 import os
 import logging
 import pandas as pd
